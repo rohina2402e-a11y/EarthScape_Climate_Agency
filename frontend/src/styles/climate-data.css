@@ -22,7 +22,7 @@
 
 .dataset-upload-panel {
   display: grid;
-  grid-template-columns: minmax(200px, 0.9fr) minmax(180px, 0.65fr) minmax(260px, 1.45fr);
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.45fr);
   align-items: center;
   gap: 16px;
   padding: 17px;
@@ -166,6 +166,27 @@
   color: #537660;
   font-size: 0.66rem;
   line-height: 1.5;
+}
+
+.dataset-upload-feedback.is-error {
+  border-color: #f0d7d2;
+  background: #fff9f8;
+  color: #a64e43;
+}
+
+.dataset-delete-button {
+  padding: 5px 8px;
+  border: 1px solid #eadbd8;
+  border-radius: 5px;
+  background: #fff;
+  color: #a65e52;
+  cursor: pointer;
+  font-size: 0.59rem;
+  font-weight: 600;
+}
+
+.dataset-delete-button:hover {
+  background: #fff6f4;
 }
 
 .dataset-list-panel {
@@ -322,6 +343,17 @@
 .dataset-status-processed {
   background: #edf5ef;
   color: #588268;
+}
+
+.dataset-status-queued,
+.dataset-status-processing {
+  background: #edf2f5;
+  color: #628091;
+}
+
+.dataset-status-failed {
+  background: #fbefed;
+  color: #b96555;
 }
 
 .dataset-status-under-review,

@@ -502,6 +502,11 @@
   color: #b96555;
 }
 
+.severity-critical {
+  background: #f8e9e8;
+  color: #963c38;
+}
+
 .severity-medium {
   background: #faf4e9;
   color: #a37c37;

@@ -14,6 +14,31 @@ export default function authRoutes({ jwtSecret }) {
   const router = Router();
   const authenticate = requireAuth({ jwtSecret });
 
+  router.post("/register", async (request, response, next) => {
+    const { email, password } = request.body ?? {};
+
+    try {
+      validateCredentials(email, password);
+      const user = await User.create({
+        email: normalizeEmail(email),
+        password: await hashPassword(password),
+        role: "analyst"
+      });
+
+      return response.status(201).json({ user: publicUser(user) });
+    } catch (error) {
+      if (error instanceof InputError) {
+        return response.status(400).json({ error: error.message });
+      }
+
+      if (error?.code === 11000) {
+        return response.status(409).json({ error: "An account with that email already exists." });
+      }
+
+      return next(error);
+    }
+  });
+
   router.post("/login", async (request, response, next) => {
     const { email, password } = request.body ?? {};
 
@@ -41,6 +66,16 @@ export default function authRoutes({ jwtSecret }) {
 
   router.get("/me", authenticate, (request, response) => {
     response.json({ user: publicUser(request.user) });
+  });
+
+  router.post("/logout", authenticate, async (request, response, next) => {
+    try {
+      request.user.tokenVersion += 1;
+      await request.user.save();
+      return response.json({ message: "Signed out successfully." });
+    } catch (error) {
+      return next(error);
+    }
   });
 
   router.post("/change-password", authenticate, async (request, response, next) => {

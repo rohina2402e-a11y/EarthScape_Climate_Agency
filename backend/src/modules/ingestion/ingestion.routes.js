@@ -3,8 +3,9 @@ import path from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import mongoose from "mongoose";
-import { requireAuth, requirePasswordUpdated } from "../../middleware/auth.js";
+import { requireAuth, requirePasswordUpdated, requireRole } from "../../middleware/auth.js";
 import { Observation } from "../observations/observation.model.js";
+import { Dataset } from "../datasets/dataset.model.js";
 import { ClimateCsvError, parseClimateCsv } from "./climate-csv.js";
 import { ClimateUpload } from "./climate-upload.model.js";
 import { WebHdfsError } from "../../services/webhdfs.service.js";
@@ -42,7 +43,7 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
     }
   });
 
-  router.post("/uploads", uploadFile.single("file"), async (request, response, next) => {
+  router.post("/uploads", requireRole("admin"), uploadFile.single("file"), async (request, response, next) => {
     if (!request.file) {
       return response.status(400).json({ error: "Choose a .csv file to upload." });
     }
@@ -112,7 +113,19 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
       upload.hdfsPath = hdfsPath;
       await upload.save();
 
-      return response.status(201).json({ upload: upload.toObject() });
+      const sourceTypes = [...new Set(observations.map((observation) => observation.sourceType))];
+      const dataset = await Dataset.create({
+        name: filename,
+        datasetType: sourceTypes.length === 1 ? sourceTypes[0] : "mixed",
+        fileFormat: "CSV",
+        uploadedBy: request.user._id,
+        processingStatus: "processed",
+        recordCount: observations.length,
+        storagePath: hdfsPath,
+        uploadId: upload._id
+      });
+
+      return response.status(201).json({ upload: upload.toObject(), dataset });
     } catch (error) {
       if (upload?._id) {
         try {

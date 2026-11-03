@@ -1,7 +1,16 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext.jsx";
 import NavIcon from "./NavIcon.jsx";
 
 export default function TopBar({ title, onMenuClick, unreadNotificationCount }) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <header className="topbar">
       <div className="topbar-leading">
@@ -37,12 +46,17 @@ export default function TopBar({ title, onMenuClick, unreadNotificationCount }) 
         </Link>
         <div className="topbar-divider" />
         <div className="topbar-user">
-          <span className="topbar-avatar">EA</span>
+          <span className="topbar-avatar" aria-hidden="true">
+            {(user?.email?.slice(0, 2) ?? "EA").toUpperCase()}
+          </span>
           <span className="topbar-user-copy">
-            <strong>EarthScape Analyst</strong>
-            <span>Climate research</span>
+            <strong>{user?.email ?? "EarthScape user"}</strong>
+            <span>{user?.role === "admin" ? "Administrator" : "Climate analyst"}</span>
           </span>
         </div>
+        <button className="topbar-signout" onClick={handleSignOut} type="button">
+          Sign out
+        </button>
       </div>
     </header>
   );

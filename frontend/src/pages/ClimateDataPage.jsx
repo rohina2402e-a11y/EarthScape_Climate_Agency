@@ -1,31 +1,47 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "../auth/AuthContext.jsx";
 import NavIcon from "../components/NavIcon.jsx";
-import { climateSources, initialClimateDatasets } from "../data/climateDatasets.js";
+import { apiRequest } from "../services/api.js";
 
-const allowedExtensions = [".csv", ".json"];
-const maximumFileSize = 50 * 1024 * 1024;
+const sourceLabels = {
+  satellite: "Satellite",
+  weather_station: "Weather station",
+  environmental_sensor: "Environmental sensor",
+  mixed: "Mixed sources",
+  other: "Other"
+};
+const formatLabels = { NETCDF: "NetCDF", GEOTIFF: "GeoTIFF" };
+const statusLabels = {
+  queued: "Queued",
+  processing: "Processing",
+  processed: "Processed",
+  failed: "Failed",
+  needs_review: "Under review"
+};
+const maximumFileSize = 5 * 1024 * 1024;
 
-function formatFileDate(date) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(date);
+function viewDataset(dataset) {
+  return {
+    ...dataset,
+    source: sourceLabels[dataset.datasetType] ?? dataset.datasetType,
+    type: formatLabels[dataset.fileFormat] ?? dataset.fileFormat,
+    date: new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }).format(new Date(dataset.uploadDate)),
+    status: statusLabels[dataset.processingStatus] ?? dataset.processingStatus,
+    records: dataset.recordCount ? dataset.recordCount.toLocaleString() : "—"
+  };
 }
 
-function getFileType(fileName) {
-  const extension = fileName.split(".").pop();
-  return extension ? extension.toUpperCase() : "FILE";
-}
-
-function UploadPanel({ onFilesSelected }) {
+function UploadPanel({ onFilesSelected, uploading }) {
   const inputRef = useRef(null);
-  const [source, setSource] = useState(climateSources[0]);
   const [isDragging, setIsDragging] = useState(false);
 
   function acceptFiles(fileList) {
-    onFilesSelected(Array.from(fileList), source);
-    if (inputRef.current) inputRef.current.value = "";
+    onFilesSelected(Array.from(fileList));
+    if (inputRef?.current) inputRef.current.value = "";
   }
 
   return (
@@ -33,16 +49,10 @@ function UploadPanel({ onFilesSelected }) {
       <div className="dataset-upload-heading">
         <div className="dataset-upload-icon"><NavIcon name="upload" size={19} /></div>
         <div>
-          <h2 id="upload-heading">Add climate data</h2>
-          <p>Choose a data source, then select CSV or JSON files.</p>
+          <h2 id="upload-heading">Import climate observations</h2>
+          <p>Upload a CSV file. Its observations are validated and saved through the API.</p>
         </div>
       </div>
-      <label className="dataset-source-field">
-        <span>Data source</span>
-        <select value={source} onChange={(event) => setSource(event.target.value)}>
-          {climateSources.map((item) => <option key={item}>{item}</option>)}
-        </select>
-      </label>
       <div
         className={`dataset-dropzone${isDragging ? " is-dragging" : ""}`}
         onDragEnter={(event) => {
@@ -61,18 +71,20 @@ function UploadPanel({ onFilesSelected }) {
         }}
       >
         <input
-          accept={allowedExtensions.join(",")}
+          accept=".csv,text/csv"
           className="visually-hidden"
-          multiple
+          disabled={uploading}
           onChange={(event) => acceptFiles(event.target.files)}
           ref={inputRef}
           type="file"
         />
         <span aria-hidden="true" className="dataset-dropzone-icon"><NavIcon name="upload" size={20} /></span>
-        <strong>Drop files here or <button onClick={() => inputRef.current?.click()} type="button">browse files</button></strong>
-        <span>CSV or JSON · up to 50 MB per file</span>
+        <strong>
+          {uploading ? "Importing…" : <>Drop a CSV here or <button onClick={() => inputRef?.current?.click()} type="button">browse files</button></>}
+        </strong>
+        <span>One CSV · up to 5 MB · requires configured HDFS storage</span>
       </div>
-      <p className="dataset-upload-note">Frontend preview only. Files are listed locally and are not sent to the server.</p>
+      <p className="dataset-upload-note">Imported files are stored in HDFS; validated observation records and dataset metadata are saved in MongoDB.</p>
     </section>
   );
 }
@@ -82,7 +94,7 @@ function DatasetStatus({ status }) {
   return <span className={`dataset-status dataset-status-${statusClass}`}>{status}</span>;
 }
 
-function DatasetTable({ datasets }) {
+function DatasetTable({ datasets, canManage, onDelete }) {
   if (datasets.length === 0) {
     return (
       <div className="dataset-empty-state">
@@ -104,6 +116,7 @@ function DatasetTable({ datasets }) {
             <th scope="col">Date added</th>
             <th scope="col">Records</th>
             <th scope="col">Status</th>
+            {canManage && <th scope="col">Manage</th>}
           </tr>
         </thead>
         <tbody>
@@ -118,8 +131,15 @@ function DatasetTable({ datasets }) {
               <td>{dataset.source}</td>
               <td><span className="dataset-type">{dataset.type}</span></td>
               <td>{dataset.date}</td>
-              <td>{dataset.records ?? "—"}</td>
+              <td>{dataset.records}</td>
               <td><DatasetStatus status={dataset.status} /></td>
+              {canManage && (
+                <td>
+                  <button className="dataset-delete-button" onClick={() => onDelete(dataset)} type="button">
+                    Delete
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -129,12 +149,33 @@ function DatasetTable({ datasets }) {
 }
 
 export default function ClimateDataPage() {
-  const [datasets, setDatasets] = useState(initialClimateDatasets);
+  const { user } = useAuth();
+  const canManage = user.role === "admin";
+  const [datasets, setDatasets] = useState([]);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("All sources");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [uploadMessage, setUploadMessage] = useState("");
-  const nextLocalId = useRef(0);
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  const refreshDatasets = useCallback(async () => {
+    const { datasets: results } = await apiRequest("/api/datasets");
+    setDatasets(results.map(viewDataset));
+    setLoadError("");
+    setError("");
+  }, []);
+
+  useEffect(() => {
+    refreshDatasets()
+      .catch((requestError) => {
+        setLoadError(requestError.message);
+        setError(requestError.message);
+      })
+      .finally(() => setLoading(false));
+  }, [refreshDatasets]);
 
   const filteredDatasets = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -147,39 +188,50 @@ export default function ClimateDataPage() {
     });
   }, [datasets, search, sourceFilter, statusFilter]);
 
-  function addLocalFiles(files, source) {
-    if (files.length === 0) return;
-    const accepted = [];
-    const rejected = [];
-
-    files.forEach((file) => {
-      const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
-      if (!allowedExtensions.includes(extension)) {
-        rejected.push(`${file.name}: choose a CSV or JSON file`);
-      } else if (file.size > maximumFileSize) {
-        rejected.push(`${file.name}: file must be 50 MB or smaller`);
-      } else {
-        accepted.push({
-          id: `local-upload-${nextLocalId.current += 1}`,
-          name: file.name,
-          source,
-          type: getFileType(file.name),
-          date: formatFileDate(new Date()),
-          status: "Ready to import",
-          records: null
-        });
-      }
-    });
-
-    if (accepted.length > 0) {
-      setDatasets((current) => [...accepted, ...current]);
+  async function importFiles(files) {
+    setUploadMessage("");
+    setError("");
+    if (files.length !== 1) {
+      setError("Choose one CSV file at a time.");
+      return;
     }
 
-    const message = [
-      accepted.length > 0 ? `${accepted.length} file${accepted.length === 1 ? "" : "s"} added to the local preview queue.` : "",
-      rejected.length > 0 ? `Not added: ${rejected.join("; ")}.` : ""
-    ].filter(Boolean).join(" ");
-    setUploadMessage(message);
+    const [file] = files;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setError("Climate observation imports must be CSV files.");
+      return;
+    }
+    if (file.size === 0 || file.size > maximumFileSize) {
+      setError("Choose a non-empty CSV file that is 5 MB or smaller.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { upload } = await apiRequest("/api/ingestion/uploads", {
+        method: "POST",
+        body: formData
+      });
+      await refreshDatasets();
+      setUploadMessage(`${upload.originalFilename} imported successfully (${upload.recordCount.toLocaleString()} observations).`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function deleteDataset(dataset) {
+    if (!window.confirm(`Delete the metadata for "${dataset.name}"?`)) return;
+    try {
+      await apiRequest(`/api/datasets/${dataset.id}`, { method: "DELETE" });
+      setDatasets((current) => current.filter((entry) => entry.id !== dataset.id));
+      setUploadMessage("Dataset metadata deleted. This does not delete the original file or observation records.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
   }
 
   return (
@@ -191,33 +243,36 @@ export default function ClimateDataPage() {
           <p>Browse incoming observations and prepare datasets for analysis.</p>
         </div>
         <div className="dataset-catalog-count">
-          <strong>1,284</strong>
-          <span>catalog datasets</span>
+          <strong>{datasets.length.toLocaleString()}</strong>
+          <span>datasets in catalog</span>
         </div>
       </header>
 
-      <div className="sample-data-banner">
-        <span className="sample-data-indicator" />
-        Sample catalog entries are illustrative. No files are uploaded or processed in this frontend preview.
-      </div>
+      {canManage ? (
+        <UploadPanel onFilesSelected={importFiles} uploading={uploading} />
+      ) : (
+        <div className="sample-data-banner">
+          <span className="sample-data-indicator" />
+          Dataset uploads and management are available to Admin accounts. Analysts can browse the catalog.
+        </div>
+      )}
 
-      <UploadPanel onFilesSelected={addLocalFiles} />
-
+      {error && <p aria-live="polite" className="dataset-upload-feedback is-error" role="alert">{error}</p>}
       {uploadMessage && <p aria-live="polite" className="dataset-upload-feedback">{uploadMessage}</p>}
 
       <section aria-labelledby="dataset-list-heading" className="dashboard-panel dataset-list-panel">
         <div className="dataset-list-heading">
           <div>
             <h2 id="dataset-list-heading">Dataset catalog</h2>
-            <p>{filteredDatasets.length} of {datasets.length} sample and local-preview datasets shown</p>
+            <p>{loading ? "Loading datasets…" : `${filteredDatasets.length} of ${datasets.length} datasets shown`}</p>
           </div>
         </div>
 
         <div className="dataset-toolbar">
           <label className="dataset-search">
-            <NavIcon name="search" size={17} />
-            <span className="visually-hidden">Search datasets</span>
+            <NavIcon name="search" size={16} />
             <input
+              aria-label="Search datasets"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search datasets..."
               type="search"
@@ -228,26 +283,25 @@ export default function ClimateDataPage() {
             <span className="visually-hidden">Filter by data source</span>
             <select onChange={(event) => setSourceFilter(event.target.value)} value={sourceFilter}>
               <option>All sources</option>
-              {climateSources.map((source) => <option key={source}>{source}</option>)}
+              {Object.values(sourceLabels).map((source) => <option key={source}>{source}</option>)}
             </select>
           </label>
           <label className="dataset-filter">
             <span className="visually-hidden">Filter by status</span>
             <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
               <option>All statuses</option>
-              <option>Processed</option>
-              <option>Under review</option>
-              <option>Needs attention</option>
-              <option>Ready to import</option>
+              {Object.values(statusLabels).map((status) => <option key={status}>{status}</option>)}
             </select>
           </label>
         </div>
 
-        <DatasetTable datasets={filteredDatasets} />
+        {loadError && datasets.length === 0
+          ? <div className="dataset-empty-state"><strong>Could not load datasets</strong><p>{loadError}</p></div>
+          : <DatasetTable datasets={filteredDatasets} canManage={canManage} onDelete={deleteDataset} />}
       </section>
       <footer className="dashboard-footer">
         <span>EarthScape Climate Agency <span className="footer-divider">·</span> Climate data catalog</span>
-        <span className="data-refresh"><span /> Sample catalog · updated 03 Nov 2026</span>
+        <span className="data-refresh"><span /> Live catalog · Express API</span>
       </footer>
     </div>
   );

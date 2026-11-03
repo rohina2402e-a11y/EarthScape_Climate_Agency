@@ -181,13 +181,18 @@ The Windows machine is not running as an administrator, so WSL and Ubuntu could 
 ## Existing API routes
 
 - `GET /api/health` — API and database readiness.
+- `POST /api/auth/register` — public Analyst-only registration; a submitted role is ignored.
 - `POST /api/auth/login` — sign in and receive a JWT.
 - `GET /api/auth/me` — current signed-in account.
+- `POST /api/auth/logout` — revoke the signed-in account's existing JWTs.
 - `POST /api/auth/change-password` — change password and invalidate existing tokens.
 - `GET /api/users` and `POST /api/users` — Admin-only account management.
+- `POST /api/datasets/upload`, `GET /api/datasets`, and `GET/DELETE /api/datasets/:id` — Admin-managed dataset metadata; analysts can view it.
+- `GET/POST /api/alerts` and `PUT/DELETE /api/alerts/:id` — Admin-managed climate alerts with per-user read status.
+- `GET/POST /api/feedback` and `PUT/DELETE /api/feedback/:id` — user-submitted support requests and Admin management.
 - `GET /api/observations` and `POST /api/observations` — authenticated climate observations.
 - `GET /api/ingestion/uploads` — recent upload history (Analysts see their own; Admins see all).
-- `POST /api/ingestion/uploads` — authenticated CSV import.
+- `POST /api/ingestion/uploads` — Admin-only real CSV import to HDFS and MongoDB.
 
 ## Import a climate CSV
 
@@ -205,4 +210,5 @@ Allowed `sourceType` values are `satellite`, `weather_station`, and `environment
 For this phase, the API parses the upload in memory and stores its observation records plus upload metadata in MongoDB. It does **not** retain the original file or write it to HDFS. HDFS storage and streaming ingestion are later phases.
 
 More detailed setup notes are in [documentation/setup.md](./documentation/setup.md).
-The frontend shell and its step-by-step run instructions are in [documentation/frontend-layout.md](./documentation/frontend-layout.md).
+The frontend authentication, protected routes, and step-by-step run instructions are in [documentation/frontend-layout.md](./documentation/frontend-layout.md).
+Role permissions and Thunder Client examples for authentication, datasets, alerts, and feedback are in [documentation/setup.md](./documentation/setup.md).

@@ -156,6 +156,10 @@
   background: #d67766;
 }
 
+.severity-dot-critical {
+  background: #9c3c39;
+}
+
 .severity-dot-medium {
   background: #d2a14e;
 }
@@ -265,6 +269,72 @@
   text-align: center;
 }
 
+.notification-delete {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border: 1px solid #eadbd8;
+  border-radius: 5px;
+  background: #fff;
+  color: #a65e52;
+  cursor: pointer;
+  font-size: 0.56rem;
+}
+
+.alert-create-panel {
+  margin-bottom: 14px;
+  padding: 16px;
+}
+
+.alert-create-panel h2 {
+  margin: 0 0 12px;
+  color: #35495b;
+  font-family: Manrope, sans-serif;
+  font-size: 0.87rem;
+}
+
+.alert-create-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px;
+}
+
+.alert-create-form label {
+  display: grid;
+  gap: 5px;
+  color: #71818d;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.alert-create-form input,
+.alert-create-form select,
+.alert-create-form textarea {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #e2e8eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #4c6070;
+  font: inherit;
+  font-size: 0.65rem;
+}
+
+.alert-create-form .alert-create-description {
+  grid-column: span 3;
+}
+
+.alert-create-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.alert-create-error {
+  color: #a64e43;
+  font-size: 0.65rem;
+}
+
 .notification-empty-state {
   display: grid;
   min-height: 210px;
@@ -296,6 +366,14 @@
 }
 
 @media (max-width: 560px) {
+  .alert-create-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .alert-create-form .alert-create-description {
+    grid-column: 1 / -1;
+  }
+
   .notification-summary {
     flex-wrap: wrap;
     gap: 9px;

@@ -278,6 +278,34 @@
   line-height: 1.4;
 }
 
+.support-request-actions {
+  display: flex;
+  grid-column: 2;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.support-request-actions select {
+  min-height: 27px;
+  padding: 3px 6px;
+  border: 1px solid #e3e9e6;
+  border-radius: 5px;
+  background: #fff;
+  color: #61717e;
+  font-size: 0.57rem;
+}
+
+.support-request-actions button {
+  padding: 4px 6px;
+  border: 1px solid #eadbd8;
+  border-radius: 5px;
+  background: #fff;
+  color: #a65e52;
+  cursor: pointer;
+  font-size: 0.56rem;
+}
+
 .support-status {
   grid-column: 2;
   justify-self: start;
@@ -290,6 +318,11 @@
 .support-status-in-progress {
   background: #f8f2e7;
   color: #a27a38;
+}
+
+.support-status-received {
+  background: #edf2f5;
+  color: #628091;
 }
 
 .support-status-open,

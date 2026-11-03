@@ -10,6 +10,7 @@ import "./styles/climate-visualizations.css";
 import "./styles/predictions.css";
 import "./styles/notifications.css";
 import "./styles/support.css";
+import "./styles/auth.css";
 import App from "./App.jsx";
 
 createRoot(document.getElementById("root")).render(

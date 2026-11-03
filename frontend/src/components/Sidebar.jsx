@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext.jsx";
 import NavIcon from "./NavIcon.jsx";
 
 const primaryNavigation = [
@@ -30,6 +31,11 @@ function NavigationLink({ item, onNavigate, unreadNotificationCount }) {
 }
 
 export default function Sidebar({ open, onClose, unreadNotificationCount }) {
+  const { user } = useAuth();
+  const dashboardNavigation = user?.role === "admin"
+    ? primaryNavigation[0]
+    : primaryNavigation[1];
+
   return (
     <>
       <button
@@ -60,9 +66,7 @@ export default function Sidebar({ open, onClose, unreadNotificationCount }) {
             item={{ to: "/", label: "Home", icon: "home" }}
             onNavigate={onClose}
           />
-          {primaryNavigation.map((item) => (
-            <NavigationLink key={item.to} item={item} onNavigate={onClose} />
-          ))}
+          <NavigationLink item={dashboardNavigation} onNavigate={onClose} />
 
           <p className="sidebar-section-label sidebar-section-spaced">CLIMATE INTELLIGENCE</p>
           {dataNavigation.map((item) => (
@@ -77,10 +81,6 @@ export default function Sidebar({ open, onClose, unreadNotificationCount }) {
           <p className="sidebar-section-label sidebar-section-spaced">ORGANIZATION</p>
           <NavigationLink
             item={{ to: "/support", label: "Feedback & support", icon: "support" }}
-            onNavigate={onClose}
-          />
-          <NavigationLink
-            item={{ to: "/login", label: "Login", icon: "shield" }}
             onNavigate={onClose}
           />
         </nav>

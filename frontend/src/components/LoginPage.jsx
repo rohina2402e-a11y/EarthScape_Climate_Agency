@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../services/api.js";
+import { homePathForUser } from "../auth/ProtectedRoutes.jsx";
 
 export default function LoginPage({ onLogin, message }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(message ?? "");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setError(message ?? "");
+  }, [message]);
 
   async function submit(event) {
     event.preventDefault();
@@ -20,6 +28,12 @@ export default function LoginPage({ onLogin, message }) {
       });
       sessionStorage.setItem("earthscapeToken", result.token);
       onLogin(result.user);
+      navigate(
+        result.user.passwordChangeRequired
+          ? "/change-password"
+          : location.state?.from?.pathname ?? homePathForUser(result.user),
+        { replace: true }
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -37,7 +51,7 @@ export default function LoginPage({ onLogin, message }) {
           </div>
           <p className="eyebrow mb-2">CLIMATE DATA WORKSPACE</p>
           <h1 className="h3 mb-2">Welcome back</h1>
-          <p className="text-secondary mb-4">Sign in with the account provided by your administrator.</p>
+          <p className="text-secondary mb-4">Sign in to your climate monitoring workspace.</p>
 
           {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
@@ -64,6 +78,7 @@ export default function LoginPage({ onLogin, message }) {
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                maxLength="72"
                 required
               />
             </div>
@@ -71,6 +86,9 @@ export default function LoginPage({ onLogin, message }) {
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+          <p className="auth-page-footer">
+            New to EarthScape? <Link to="/register">Create an Analyst account</Link>
+          </p>
         </div>
       </section>
     </main>

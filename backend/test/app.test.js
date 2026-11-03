@@ -51,6 +51,29 @@ test("climate file ingestion requires authentication", async () => {
   assert.equal(response.status, 401);
 });
 
+test("dataset, alert, and feedback APIs require authentication", async () => {
+  const requests = [
+    fetch(`${baseUrl}/api/datasets`),
+    fetch(`${baseUrl}/api/datasets/upload`, { method: "POST" }),
+    fetch(`${baseUrl}/api/alerts`),
+    fetch(`${baseUrl}/api/alerts`, { method: "POST" }),
+    fetch(`${baseUrl}/api/feedback`),
+    fetch(`${baseUrl}/api/feedback`, { method: "POST" })
+  ];
+  const responses = await Promise.all(requests);
+  assert.deepEqual(responses.map((response) => response.status), [401, 401, 401, 401, 401, 401]);
+});
+
+test("invalid bearer tokens cannot access dataset, alert, or feedback records", async () => {
+  const headers = { Authorization: "Bearer invalid-token" };
+  const responses = await Promise.all([
+    fetch(`${baseUrl}/api/datasets`, { headers }),
+    fetch(`${baseUrl}/api/alerts`, { headers }),
+    fetch(`${baseUrl}/api/feedback`, { headers })
+  ]);
+  assert.deepEqual(responses.map((response) => response.status), [401, 401, 401]);
+});
+
 test("climate CSV imports require configured HDFS storage", async () => {
   const form = new FormData();
   form.append(

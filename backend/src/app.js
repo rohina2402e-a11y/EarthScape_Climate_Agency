@@ -3,6 +3,9 @@ import express from "express";
 import multer from "multer";
 import mongoose from "mongoose";
 import authRoutes from "./modules/auth/auth.routes.js";
+import alertRoutes from "./modules/alerts/alert.routes.js";
+import datasetRoutes from "./modules/datasets/dataset.routes.js";
+import feedbackRoutes from "./modules/feedback/feedback.routes.js";
 import ingestionRoutes from "./modules/ingestion/ingestion.routes.js";
 import observationRoutes from "./modules/observations/observation.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
@@ -23,6 +26,9 @@ export function createApp({ frontendOrigin, jwtSecret, hdfsClient }) {
   });
 
   app.use("/api/auth", authRoutes({ jwtSecret }));
+  app.use("/api/datasets", datasetRoutes({ jwtSecret }));
+  app.use("/api/alerts", alertRoutes({ jwtSecret }));
+  app.use("/api/feedback", feedbackRoutes({ jwtSecret }));
   app.use("/api/users", userRoutes({ jwtSecret }));
   app.use("/api/observations", observationRoutes({ jwtSecret }));
   app.use("/api/ingestion", ingestionRoutes({ jwtSecret, hdfsClient }));

@@ -1,0 +1,48 @@
+import mongoose from "mongoose";
+
+const datasetSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true, maxlength: 200 },
+    datasetType: {
+      type: String,
+      enum: ["satellite", "weather_station", "environmental_sensor", "mixed", "other"],
+      required: true
+    },
+    fileFormat: {
+      type: String,
+      enum: ["CSV", "JSON", "NETCDF", "GEOTIFF", "PARQUET", "OTHER"],
+      required: true
+    },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    processingStatus: {
+      type: String,
+      enum: ["queued", "processing", "processed", "failed", "needs_review"],
+      default: "queued"
+    },
+    recordCount: { type: Number, min: 0, default: 0 },
+    storagePath: { type: String, maxlength: 1024 },
+    uploadId: { type: mongoose.Schema.Types.ObjectId, ref: "ClimateUpload", unique: true, sparse: true }
+  },
+  { timestamps: true, collection: "datasets" }
+);
+
+datasetSchema.index({ uploadedBy: 1, createdAt: -1 });
+
+export const Dataset = mongoose.model("Dataset", datasetSchema);
+
+export function publicDataset(dataset) {
+  const uploadedBy = dataset.uploadedBy;
+  return {
+    id: dataset._id.toString(),
+    name: dataset.name,
+    datasetType: dataset.datasetType,
+    fileFormat: dataset.fileFormat,
+    uploadDate: dataset.createdAt,
+    uploadedBy: typeof uploadedBy === "object" && uploadedBy?.email
+      ? { id: uploadedBy._id.toString(), email: uploadedBy.email }
+      : uploadedBy?.toString(),
+    processingStatus: dataset.processingStatus,
+    recordCount: dataset.recordCount,
+    storagePath: dataset.storagePath
+  };
+}
