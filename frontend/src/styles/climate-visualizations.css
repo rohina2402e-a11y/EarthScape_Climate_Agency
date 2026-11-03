@@ -1,0 +1,177 @@
+.visualization-loading {
+  margin: 0;
+  padding: 24px;
+  color: #748394;
+  font-size: 0.8rem;
+}
+
+.visualization-period {
+  display: flex;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid #e4e9ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #667787;
+  font-size: 0.67rem;
+}
+
+.climate-map-panel {
+  padding: 17px 18px 12px;
+}
+
+.map-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 13px;
+}
+
+.map-panel-heading h2 {
+  margin: 0;
+  color: #35495b;
+  font-family: Manrope, sans-serif;
+  font-size: 0.87rem;
+  font-weight: 700;
+}
+
+.map-panel-heading p {
+  margin: 4px 0 0;
+  color: #96a1aa;
+  font-size: 0.65rem;
+}
+
+.map-layer-switch {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #ebeff1;
+  border-radius: 7px;
+  background: #f8f9fa;
+}
+
+.map-layer-switch button {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #87949e;
+  cursor: pointer;
+  font-size: 0.61rem;
+  font-weight: 600;
+}
+
+.map-layer-switch button:hover {
+  color: #2f7253;
+}
+
+.map-layer-switch button.is-selected {
+  background: #fff;
+  color: #2e7655;
+  box-shadow: 0 1px 3px rgb(39 62 47 / 10%);
+}
+
+.climate-map-wrap {
+  height: 330px;
+  overflow: hidden;
+  border: 1px solid #e5eaec;
+  border-radius: 8px;
+  background: #edf2f1;
+}
+
+.climate-map-wrap .leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: "DM Sans", sans-serif;
+}
+
+.climate-map-wrap .leaflet-popup-content,
+.climate-map-wrap .leaflet-tooltip {
+  color: #435969;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+}
+
+.climate-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding-top: 11px;
+  color: #89969f;
+  font-size: 0.6rem;
+}
+
+.climate-map-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.map-legend-normal {
+  background: #43835f;
+}
+
+.map-legend-high {
+  background: #d67862;
+}
+
+.climate-map-legend > span:last-child {
+  margin-left: auto;
+  color: #a0aab2;
+}
+
+.visualization-chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.visualization-chart-panel {
+  padding-bottom: 12px;
+}
+
+.visualization-chart-wrap {
+  position: relative;
+  height: 245px;
+  margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  .visualization-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .climate-map-panel {
+    padding: 14px 12px 11px;
+  }
+
+  .map-panel-heading {
+    flex-direction: column;
+  }
+
+  .climate-map-wrap {
+    height: 280px;
+  }
+
+  .climate-map-legend > span:last-child {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .visualization-chart-wrap {
+    height: 225px;
+  }
+}

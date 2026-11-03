@@ -1,0 +1,235 @@
+import { useMemo, useState } from "react";
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+import { predictionAnomalies, predictionHorizons, rainfallForecast, temperatureForecast } from "../data/predictionData.js";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+
+function ForecastChart({ kind, horizon }) {
+  const isTemperature = kind === "temperature";
+  const series = isTemperature ? temperatureForecast : rainfallForecast;
+  const unit = isTemperature ? "°C" : "mm";
+  const actualColor = isTemperature ? "#2b805f" : "#4b8aa1";
+  const labels = [...series.historicalLabels, ...series.forecastLabels.slice(0, horizon)];
+  const chartData = useMemo(() => ({
+    labels,
+    datasets: [
+      {
+        label: "Historical sample",
+        data: [...series.historical, ...Array(horizon).fill(null)],
+        borderColor: actualColor,
+        backgroundColor: actualColor,
+        borderWidth: 2.2,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        tension: 0.32,
+        spanGaps: false
+      },
+      {
+        label: "Illustrative forecast",
+        data: [
+          ...Array(series.historical.length - 1).fill(null),
+          series.historical.at(-1),
+          ...series.forecast.slice(0, horizon)
+        ],
+        borderColor: "#c58c49",
+        backgroundColor: "#c58c49",
+        borderDash: [6, 4],
+        borderWidth: 2,
+        pointRadius: 2.5,
+        pointHoverRadius: 5,
+        tension: 0.32,
+        fill: false
+      }
+    ]
+  }), [actualColor, horizon, series, labels]);
+
+  const options = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: {
+        position: "bottom",
+        align: "start",
+        labels: {
+          usePointStyle: true,
+          pointStyle: "circle",
+          boxWidth: 7,
+          boxHeight: 7,
+          padding: 17,
+          color: "#7b8995",
+          font: { family: "DM Sans", size: 10 }
+        }
+      },
+      tooltip: {
+        backgroundColor: "#1d384b",
+        padding: 10,
+        callbacks: {
+          label: (context) => context.parsed.y === null
+            ? ""
+            : `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ${unit}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { color: "#9aa6b0", font: { family: "DM Sans", size: 10 }, maxRotation: 0 }
+      },
+      y: {
+        beginAtZero: !isTemperature,
+        border: { display: false },
+        grid: { color: "#edf0f2", drawTicks: false },
+        ticks: {
+          color: "#9aa6b0",
+          font: { family: "DM Sans", size: 10 },
+          padding: 8,
+          callback: (value) => `${value}${isTemperature ? "°" : ""}`
+        }
+      }
+    }
+  }), [isTemperature, unit]);
+
+  return <Line aria-label={`${horizon}-month ${kind} forecast chart`} data={chartData} options={options} />;
+}
+
+function HorizonSelector({ horizon, onChange }) {
+  return (
+    <div aria-label="Forecast horizon" className="range-switch" role="group">
+      {predictionHorizons.map((months) => (
+        <button
+          aria-pressed={horizon === months}
+          className={horizon === months ? "is-selected" : ""}
+          key={months}
+          onClick={() => onChange(months)}
+          type="button"
+        >
+          {months}M
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PredictionSignal({ anomaly }) {
+  const severityClass = anomaly.severity.toLowerCase();
+  return (
+    <article className="prediction-signal">
+      <span className={`alert-severity alert-severity-${severityClass}`} />
+      <div className="prediction-signal-copy">
+        <strong>{anomaly.title}</strong>
+        <span>{anomaly.region} · {anomaly.description}</span>
+      </div>
+      <div className="prediction-signal-confidence">
+        <strong>{anomaly.probability}</strong>
+        <span>sample likelihood</span>
+      </div>
+      <span className={`severity-label severity-${severityClass}`}>{anomaly.severity}</span>
+    </article>
+  );
+}
+
+export default function PredictionsPage() {
+  const [horizon, setHorizon] = useState(6);
+
+  return (
+    <div className="admin-dashboard predictions-page">
+      <header className="dashboard-page-heading">
+        <div>
+          <p className="eyebrow">CLIMATE INTELLIGENCE <span>·</span> OUTLOOK</p>
+          <h1>Climate predictions</h1>
+          <p>Review illustrative temperature and rainfall outlooks.</p>
+        </div>
+        <HorizonSelector horizon={horizon} onChange={setHorizon} />
+      </header>
+
+      <div className="sample-data-banner prediction-sample-banner">
+        <span className="sample-data-indicator" />
+        Demonstration only: these forecasts and likelihoods are illustrative, not generated by a trained model.
+      </div>
+
+      <section aria-label="Forecast summary" className="prediction-summary-grid">
+        <article className="prediction-summary-card">
+          <span className="prediction-summary-icon prediction-icon-green" aria-hidden="true">°</span>
+          <div>
+            <span>Temperature outlook</span>
+            <strong>+1.4 °C</strong>
+            <small>sample change by {horizon} months</small>
+          </div>
+        </article>
+        <article className="prediction-summary-card">
+          <span className="prediction-summary-icon prediction-icon-blue" aria-hidden="true">↗</span>
+          <div>
+            <span>Rainfall outlook</span>
+            <strong>−6.8%</strong>
+            <small>sample change by {horizon} months</small>
+          </div>
+        </article>
+        <article className="prediction-summary-card">
+          <span className="prediction-summary-icon prediction-icon-amber" aria-hidden="true">!</span>
+          <div>
+            <span>Signals for review</span>
+            <strong>{predictionAnomalies.length}</strong>
+            <small>illustrative anomaly flags</small>
+          </div>
+        </article>
+      </section>
+
+      <div className="dashboard-chart-grid prediction-chart-grid">
+        <section aria-labelledby="temperature-forecast-heading" className="dashboard-panel prediction-chart-panel">
+          <div className="panel-heading">
+            <div>
+              <h2 id="temperature-forecast-heading">Temperature trend</h2>
+              <p>Historical sample and {horizon}-month outlook · °C</p>
+            </div>
+            <span className="prediction-chart-unit">°C</span>
+          </div>
+          <div className="prediction-chart-wrap">
+            <ForecastChart horizon={horizon} kind="temperature" />
+          </div>
+        </section>
+        <section aria-labelledby="rainfall-forecast-heading" className="dashboard-panel prediction-chart-panel">
+          <div className="panel-heading">
+            <div>
+              <h2 id="rainfall-forecast-heading">Rainfall prediction</h2>
+              <p>Historical sample and {horizon}-month outlook · mm</p>
+            </div>
+            <span className="prediction-chart-unit">mm</span>
+          </div>
+          <div className="prediction-chart-wrap">
+            <ForecastChart horizon={horizon} kind="rainfall" />
+          </div>
+        </section>
+      </div>
+
+      <section aria-labelledby="prediction-anomalies-heading" className="dashboard-panel prediction-anomaly-panel">
+        <div className="panel-heading">
+          <div>
+            <h2 id="prediction-anomalies-heading">Anomaly detection results</h2>
+            <p>Illustrative signals requiring human review</p>
+          </div>
+          <span className="prediction-model-label">Sample analysis</span>
+        </div>
+        <div className="prediction-signal-list">
+          {predictionAnomalies.map((anomaly) => <PredictionSignal anomaly={anomaly} key={anomaly.title} />)}
+        </div>
+      </section>
+
+      <footer className="dashboard-footer">
+        <span>EarthScape Climate Agency <span className="footer-divider">·</span> Prediction preview</span>
+        <span className="data-refresh"><span /> Sample outlook · 03 Nov 2026</span>
+      </footer>
+    </div>
+  );
+}
