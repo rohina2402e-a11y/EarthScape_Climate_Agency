@@ -112,6 +112,33 @@ class TabularClimateTests(unittest.TestCase):
         self.assertEqual(summary["statistics"]["rainfall"]["count"], 0)
         self.assertIsNone(summary["statistics"]["rainfall"]["mean"])
 
+    def test_summary_includes_missing_percentages_and_monthly_yearly_trends(self) -> None:
+        frame = self.load_text(
+            "trends.csv",
+            (
+                "observedAt,location,temperature,rainfall,humidity,windSpeed,pressure\n"
+                "2025-12-31T23:00:00Z,Harbor,10,2,50,4,1010\n"
+                "2026-01-01T00:00:00Z,Harbor,20,4,60,6,1008\n"
+                "2026-01-02T00:00:00Z,Harbor,,6,70,8,1006\n"
+            )
+        )
+
+        summary = climate_data_summary(frame)
+
+        self.assertAlmostEqual(summary["missing_percentages"]["temperature"], 100 / 3)
+        self.assertEqual(
+            [(trend["period"], trend["record_count"]) for trend in summary["monthly_trends"]],
+            [("2025-12", 1), ("2026-01", 2)]
+        )
+        self.assertEqual(summary["monthly_trends"][1]["temperature"]["mean"], 20.0)
+        self.assertEqual(
+            [(trend["period"], trend["record_count"]) for trend in summary["yearly_trends"]],
+            [("2025", 1), ("2026", 2)]
+        )
+        self.assertEqual(summary["yearly_trends"][1]["temperature"]["minimum"], 20.0)
+        self.assertEqual(summary["yearly_trends"][1]["temperature"]["maximum"], 20.0)
+        self.assertEqual(summary["yearly_trends"][1]["rainfall"]["mean"], 5.0)
+
     def test_unsupported_format_returns_a_clear_error(self) -> None:
         with self.assertRaisesRegex(ClimateDataError, "Unsupported tabular climate format"):
             load_tabular_climate_file("unknown.bin")

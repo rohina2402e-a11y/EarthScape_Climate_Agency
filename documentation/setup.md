@@ -39,7 +39,17 @@ The `.venv` virtual environment belongs at the repository root and is ignored by
 
 The packages cover tabular processing, larger-than-memory Dask workloads, MongoDB access, machine learning, NetCDF, HDF5, and GeoTIFF. Python's standard library will handle XML.
 
-The climate reader is in `machine-learning/climate_processing/tabular.py`. It supports CSV, JSON, and XML records; NetCDF grids with time/latitude/longitude coordinates; HDF5 files with same-length named datasets; and GeoTIFF climate bands. Common field names are normalized, invalid or missing values become Pandas missing values, and incomplete records are kept for review. GeoTIFF files need a coordinate reference system and variable names in band descriptions/tags (a single-band file can use its filename). The summary reports missing counts and temperature, rainfall, humidity, wind-speed, and pressure statistics. Values in a dataset must use consistent units; automatic unit conversion is not performed.
+The reusable climate reader is in `machine-learning/climate_processing/tabular.py`. It supports CSV, JSON, and XML records; NetCDF grids with time/latitude/longitude coordinates; HDF5 files with same-length named datasets; and GeoTIFF climate bands. Common field names are normalized, invalid or missing values become Pandas missing values, and incomplete records are kept for review. GeoTIFF files need a coordinate reference system and variable names in band descriptions/tags (a single-band file can use its filename). The analysis reports missing counts and percentages, temperature/rainfall/humidity/wind-speed/pressure statistics, and monthly and yearly trends. Values in a dataset must use consistent units; automatic unit conversion is not performed.
+
+Run the standalone readers or clean/analyze a dataset from the repository root. First try the included sample file:
+
+```powershell
+.\.venv\Scripts\python.exe machine-learning\scripts\read_csv.py machine-learning\datasets\sample-climate.csv
+.\.venv\Scripts\python.exe machine-learning\scripts\clean_data.py machine-learning\datasets\sample-climate.csv "$env:TEMP\earthscape-cleaned-climate.csv"
+.\.venv\Scripts\python.exe machine-learning\scripts\analyze_climate.py machine-learning\datasets\sample-climate.csv
+```
+
+Expected: the analysis reports `record_count` 3, with monthly periods `2026-01` and `2026-02`, and a yearly period `2026`. Each reader prints a JSON analysis summary to the terminal. The cleaning script writes a normalized CSV to your Windows temporary folder and does not overwrite the original input. To process an uploaded dataset, replace `machine-learning\datasets\sample-climate.csv` with its path, such as `backend\uploads\weather\your-dataset.csv`. Use `read_csv.py --large <file.csv>` or `analyze_climate.py --large <file.csv>` to process a large CSV with Dask; add `--blocksize 64MB` to choose an approximate partition size.
 
 Run its tests from the repository root:
 

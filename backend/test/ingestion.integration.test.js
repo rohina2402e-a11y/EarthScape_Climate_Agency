@@ -156,13 +156,18 @@ test("authenticated CSV imports create observations and upload history", { skip:
   assert.equal(failedUpload.status, "failed");
   assert.equal(await Observation.countDocuments(), 2);
 
-  async function uploadDataset(accessToken, filename = "sample-weather.csv") {
+  async function uploadDataset(
+    accessToken,
+    filename = "sample-weather.csv",
+    datasetType = "weather_station",
+    content = "date,temperature\n2026-11-03,18"
+  ) {
     const form = new FormData();
-    form.append("name", "Sample weather observations");
-    form.append("datasetType", "weather_station");
+    form.append("name", "Sample climate dataset");
+    form.append("datasetType", datasetType);
     form.append(
       "file",
-      new Blob(["date,temperature\n2026-11-03,18"], { type: "text/csv" }),
+      new Blob([content]),
       filename
     );
     return fetch(`${baseUrl}/api/datasets/upload`, {
@@ -178,7 +183,7 @@ test("authenticated CSV imports create observations and upload history", { skip:
   const datasetResponse = await uploadDataset(adminToken);
   assert.equal(datasetResponse.status, 201);
   const { dataset } = await datasetResponse.json();
-  assert.equal(dataset.name, "Sample weather observations");
+  assert.equal(dataset.name, "Sample climate dataset");
   assert.equal(dataset.datasetType, "weather_station");
   assert.equal(dataset.fileFormat, "CSV");
   assert.equal(dataset.fileSize, Buffer.byteLength("date,temperature\n2026-11-03,18"));
@@ -208,6 +213,37 @@ test("authenticated CSV imports create observations and upload history", { skip:
   assert.equal(deleteResponse.status, 200);
   await assert.rejects(readFile(path.join(storageDirectory, "datasets", dataset.storagePath)));
   assert.equal(await Dataset.findById(dataset.id), null);
+
+  const supportedFormats = [
+    ["sample.json", "JSON", "environmental_sensor", "sensors"],
+    ["sample.xml", "XML", "historical", "historical"],
+    ["sample.nc", "NETCDF", "satellite", "satellite"],
+    ["sample.nc4", "NETCDF", "satellite", "satellite"],
+    ["sample.netcdf", "NETCDF", "historical", "historical"],
+    ["sample.h5", "HDF5", "weather_station", "weather"],
+    ["sample.hdf5", "HDF5", "environmental_sensor", "sensors"],
+    ["sample.tif", "GEOTIFF", "satellite", "satellite"],
+    ["sample.tiff", "GEOTIFF", "historical", "historical"]
+  ];
+  for (const [filename, fileFormat, datasetType, folder] of supportedFormats) {
+    const formatResponse = await uploadDataset(adminToken, filename, datasetType, "format test");
+    assert.equal(formatResponse.status, 201);
+    const { dataset: formatDataset } = await formatResponse.json();
+    assert.equal(formatDataset.fileFormat, fileFormat);
+    assert.ok(formatDataset.storagePath.startsWith(`${folder}/`));
+    assert.equal(
+      await readFile(path.join(storageDirectory, "datasets", formatDataset.storagePath), "utf8"),
+      "format test"
+    );
+    assert.equal(
+      (await fetch(`${baseUrl}/api/datasets/${formatDataset.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${adminToken}` }
+      })).status,
+      200
+    );
+  }
+
   assert.equal(await ClimateUpload.countDocuments({ status: "failed" }), 1);
   const unavailableCsv = [
     "sourceType,sourceId,observedAt,latitude,longitude,measurementName,value,unit",

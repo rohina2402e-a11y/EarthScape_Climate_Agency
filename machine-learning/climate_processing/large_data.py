@@ -183,6 +183,10 @@ def summarize_large_climate_data(frame: dd.DataFrame) -> dict[str, Any]:
         for column in OUTPUT_COLUMNS
         if ("missing_values", column) in results
     }
+    missing_percentages = {
+        column: 0.0 if record_count == 0 else count / record_count * 100
+        for column, count in missing_values.items()
+    }
 
     statistics = {}
     for column in MEASUREMENT_COLUMNS:
@@ -197,13 +201,44 @@ def summarize_large_climate_data(frame: dd.DataFrame) -> dict[str, Any]:
             "maximum": _optional_float(results[("statistics_maximum", column)])
         }
 
+    def summarize_trends(period_format: str) -> list[dict[str, Any]]:
+        dated = frame.assign(
+            _period=frame["observed_at"].dt.strftime(period_format)
+        ).dropna(subset=["_period"])
+        grouped = dated.groupby("_period")
+        trend_tasks = [grouped.size()]
+        for column in MEASUREMENT_COLUMNS:
+            for operation in ("mean", "min", "max"):
+                trend_tasks.append(getattr(grouped[column], operation)())
+        trend_results = compute(*trend_tasks)
+        counts = trend_results[0]
+        trends = []
+        for period in sorted(counts.index):
+            trend: dict[str, Any] = {
+                "period": str(period),
+                "record_count": int(counts.loc[period])
+            }
+            result_index = 1
+            for column in MEASUREMENT_COLUMNS:
+                trend[column] = {
+                    "mean": _optional_float(trend_results[result_index].get(period)),
+                    "minimum": _optional_float(trend_results[result_index + 1].get(period)),
+                    "maximum": _optional_float(trend_results[result_index + 2].get(period))
+                }
+                result_index += 3
+            trends.append(trend)
+        return trends
+
     complete_count = int(results["complete_record_count"])
     return {
         "record_count": record_count,
         "complete_record_count": complete_count,
         "incomplete_record_count": record_count - complete_count,
         "missing_values": missing_values,
-        "statistics": statistics
+        "missing_percentages": missing_percentages,
+        "statistics": statistics,
+        "monthly_trends": summarize_trends("%Y-%m"),
+        "yearly_trends": summarize_trends("%Y")
     }
 
 

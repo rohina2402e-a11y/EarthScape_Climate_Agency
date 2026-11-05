@@ -53,6 +53,12 @@ class LargeClimateTests(unittest.TestCase):
         self.assertAlmostEqual(summary["statistics"]["temperature"]["mean"], 19.5)
         self.assertEqual(summary["statistics"]["temperature"]["maximum"], 39.0)
         self.assertEqual(summary["missing_values"]["humidity"], 8)
+        self.assertEqual(summary["missing_percentages"]["humidity"], 20.0)
+        self.assertEqual(summary["monthly_trends"][0]["period"], "2026-07")
+        self.assertEqual(summary["monthly_trends"][0]["record_count"], 40)
+        self.assertAlmostEqual(summary["monthly_trends"][0]["temperature"]["mean"], 19.5)
+        self.assertEqual(summary["yearly_trends"][0]["period"], "2026")
+        self.assertEqual(summary["yearly_trends"][0]["record_count"], 40)
 
     def test_large_legacy_measurements_from_multiple_partitions_are_grouped(self) -> None:
         rows = []

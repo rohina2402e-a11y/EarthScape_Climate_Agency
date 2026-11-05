@@ -427,6 +427,11 @@ def climate_data_summary(frame: pd.DataFrame) -> dict[str, Any]:
         for column in OUTPUT_COLUMNS
         if column in frame.columns
     }
+    record_count = len(frame)
+    missing_percentages = {
+        column: 0.0 if record_count == 0 else count / record_count * 100
+        for column, count in missing_counts.items()
+    }
     has_location = frame["location"].notna() | (
         frame["latitude"].notna() & frame["longitude"].notna()
     )
@@ -449,10 +454,33 @@ def climate_data_summary(frame: pd.DataFrame) -> dict[str, Any]:
             "maximum": None if values.empty else float(values.max())
         }
 
+    def summarize_trends(period_format: str) -> list[dict[str, Any]]:
+        timestamps = pd.to_datetime(frame["observed_at"], errors="coerce", utc=True)
+        periods = timestamps.dt.strftime(period_format)
+        climate_frame = frame.assign(_period=periods).dropna(subset=["_period"])
+        trends = []
+        for period, group in climate_frame.groupby("_period", sort=True):
+            trend: dict[str, Any] = {
+                "period": str(period),
+                "record_count": int(len(group))
+            }
+            for column in MEASUREMENT_COLUMNS:
+                values = pd.to_numeric(group[column], errors="coerce").dropna()
+                trend[column] = {
+                    "mean": None if values.empty else float(values.mean()),
+                    "minimum": None if values.empty else float(values.min()),
+                    "maximum": None if values.empty else float(values.max())
+                }
+            trends.append(trend)
+        return trends
+
     return {
-        "record_count": int(len(frame)),
+        "record_count": int(record_count),
         "complete_record_count": int(complete.sum()),
         "incomplete_record_count": int((~complete).sum()),
         "missing_values": missing_counts,
-        "statistics": statistics
+        "missing_percentages": missing_percentages,
+        "statistics": statistics,
+        "monthly_trends": summarize_trends("%Y-%m"),
+        "yearly_trends": summarize_trends("%Y")
     }
