@@ -5,15 +5,17 @@ const datasetSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 200 },
     datasetType: {
       type: String,
-      enum: ["satellite", "weather_station", "environmental_sensor", "mixed", "other"],
+      enum: ["satellite", "weather_station", "environmental_sensor", "historical", "mixed", "other"],
       required: true
     },
     fileFormat: {
       type: String,
-      enum: ["CSV", "JSON", "NETCDF", "GEOTIFF", "PARQUET", "OTHER"],
+      enum: ["CSV", "JSON", "XML", "NETCDF", "HDF5", "GEOTIFF", "PARQUET", "OTHER"],
       required: true
     },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    originalFilename: { type: String, maxlength: 200 },
+    fileSize: { type: Number, min: 1 },
     processingStatus: {
       type: String,
       enum: ["queued", "processing", "processed", "failed", "needs_review"],
@@ -37,6 +39,8 @@ export function publicDataset(dataset) {
     name: dataset.name,
     datasetType: dataset.datasetType,
     fileFormat: dataset.fileFormat,
+    originalFilename: dataset.originalFilename,
+    fileSize: dataset.fileSize,
     uploadDate: dataset.createdAt,
     uploadedBy: typeof uploadedBy === "object" && uploadedBy?.email
       ? { id: uploadedBy._id.toString(), email: uploadedBy.email }

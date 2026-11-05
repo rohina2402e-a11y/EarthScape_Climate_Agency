@@ -1,0 +1,15 @@
+# Tabular climate data and scalable processing
+numpy>=2.0,<3.0
+pandas>=2.2,<4.0
+dask[dataframe]>=2025.1,<2027
+
+# MongoDB metadata integration and future machine learning
+pymongo>=4.10,<5.0
+scikit-learn>=1.6,<2.0
+tensorflow>=2.20,<3.0
+
+# Scientific and geospatial climate formats
+xarray>=2025.1
+netCDF4>=1.7,<2.0
+h5py>=3.12,<4.0
+rasterio>=1.4,<2.0

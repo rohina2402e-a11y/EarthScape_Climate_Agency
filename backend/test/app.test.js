@@ -25,8 +25,7 @@ test("health endpoint reports when MongoDB is disconnected", async () => {
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), {
     status: "unavailable",
-    database: "disconnected",
-    hdfs: "unconfigured"
+    database: "disconnected"
   });
 });
 
@@ -74,7 +73,7 @@ test("invalid bearer tokens cannot access dataset, alert, or feedback records", 
   assert.deepEqual(responses.map((response) => response.status), [401, 401, 401]);
 });
 
-test("climate CSV imports require configured HDFS storage", async () => {
+test("climate CSV imports require authentication", async () => {
   const form = new FormData();
   form.append(
     "file",

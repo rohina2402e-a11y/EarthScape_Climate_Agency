@@ -26,7 +26,6 @@ export default function AuthenticatedApp() {
   const [observations, setObservations] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [connection, setConnection] = useState("checking");
-  const [hdfsConfigured, setHdfsConfigured] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [showPasswordPanel, setShowPasswordPanel] = useState(false);
@@ -75,7 +74,6 @@ export default function AuthenticatedApp() {
     apiRequest("/api/health", { auth: false })
       .then((health) => {
         setConnection(health.database);
-        setHdfsConfigured(health.hdfs === "configured");
       })
       .catch(() => setConnection("unavailable"));
     loadObservations();
@@ -174,7 +172,6 @@ export default function AuthenticatedApp() {
 
         <div className="mb-4">
           <ClimateUploadPanel
-            hdfsConfigured={hdfsConfigured}
             onError={handlePanelError}
             onImported={loadObservations}
           />

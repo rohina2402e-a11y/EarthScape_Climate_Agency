@@ -5,9 +5,13 @@ coverage/
 .env.*
 !.env.example
 *.log
+**/.venv/
+__pycache__/
+*.py[cod]
 
 # Local data and IDE files
 data/
+/backend/uploads/
 .idea/
 .vscode/*
 !.vscode/extensions.json

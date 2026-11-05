@@ -82,9 +82,9 @@ function UploadPanel({ onFilesSelected, uploading }) {
         <strong>
           {uploading ? "Importing…" : <>Drop a CSV here or <button onClick={() => inputRef?.current?.click()} type="button">browse files</button></>}
         </strong>
-        <span>One CSV · up to 5 MB · requires configured HDFS storage</span>
+        <span>One CSV · up to 5 MB · stored locally</span>
       </div>
-      <p className="dataset-upload-note">Imported files are stored in HDFS; validated observation records and dataset metadata are saved in MongoDB.</p>
+      <p className="dataset-upload-note">Original files are stored locally; validated observation records and dataset metadata are saved in MongoDB.</p>
     </section>
   );
 }

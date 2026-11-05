@@ -1,6 +1,6 @@
 # EarthScape Climate Agency
 
-EarthScape is being developed in small phases. The project includes a React/Vite frontend, an Express API, MongoDB-backed observations, Admin/Analyst authentication, and authenticated CSV climate-data ingestion. The big-data and machine-learning folders are separate placeholders for later phases.
+EarthScape is being developed in small phases. The project includes a React/Vite frontend, an Express API, MongoDB-backed observations and dataset metadata, Admin/Analyst authentication, and a Python environment for climate data processing. Original climate files are stored locally during development.
 
 > **Use the existing project folder.** The current repository is `EarthScape_Climate_Agency`. Do not create another copy or run the Vite scaffolding command over this project.
 
@@ -29,8 +29,6 @@ EarthScape_Climate_Agency/
 │   ├── scripts/               # One-time setup commands
 │   └── test/
 ├── bigdata/
-│   ├── hadoop/
-│   ├── mapreduce/
 │   ├── hive/
 │   ├── kafka/
 │   └── spark/
@@ -42,17 +40,16 @@ EarthScape_Climate_Agency/
 └── .vscode/
 ```
 
-The current frontend and backend use the conventional `src` layout created for the existing application. Hadoop and ML files live outside those folders so the technologies do not get mixed together.
+The current frontend and backend use the conventional `src` layout created for the existing application. Python climate-processing dependencies live in `machine-learning/requirements.txt`; the local Python virtual environment is kept at the repository root and ignored by Git.
 
 ## Requirements
 
 - VS Code with its integrated PowerShell terminal.
 - Node.js 20.19+ or 22.12+ and npm.
 - MongoDB Community Server running locally, or a MongoDB URI.
-- For Hadoop 3.5: a **64-bit JDK 17**. JDK 17 is installed at `C:\Program Files\Java\jdk-17`, but the current Windows `PATH` still selects Java 8.
-- For later machine learning: a **64-bit Python 3.11** installation is a practical starting point. The installed Python 3.14 may be too new for some Spark and TensorFlow dependencies.
+- A **64-bit Python 3.13** installation for climate data processing and analysis.
 
-Hadoop is being configured directly in Ubuntu under WSL 2; no Docker or Kubernetes is used. Hive, Kafka, and Spark are separate later phases.
+The climate processing stack uses Pandas, NumPy, Dask, PyMongo, scikit-learn, TensorFlow, xarray, netCDF4, h5py, and Rasterio. XML parsing uses Python's standard library.
 
 ## Open in VS Code
 
@@ -145,29 +142,24 @@ npm create vite@latest frontend -- --template react
 
 Do not run that command in this existing repository; it would create or overwrite another frontend scaffold.
 
-## Java and Python setup
+## Python climate environment
 
-Check versions in the VS Code terminal:
-
-```powershell
-java -version
-python --version
-```
-
-This computer has a supported **64-bit JDK 17** at `C:\Program Files\Java\jdk-17`, but `java` on the Windows `PATH` currently runs older 32-bit Java 8. Hadoop will use a separate Java 17 installation inside Ubuntu on WSL, so the Windows Java `PATH` does not need to be changed. For the ML environment, install **64-bit Python 3.11** from python.org and later create an isolated virtual environment inside `machine-learning`:
+Install Python 3.13 from the [official Python downloads page](https://www.python.org/downloads/windows/) if it is not already installed. In a VS Code PowerShell terminal opened at the repository root, create the virtual environment and install the climate libraries:
 
 ```powershell
-Set-Location C:\Users\Admin\Documents\GitHub\EarthScape_Climate_Agency\machine-learning
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python --version
+py -3.13 --version
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements.txt
+.\.venv\Scripts\python.exe -m pip check
 ```
 
-Do not install TensorFlow or Spark until their versions are selected together in later phases.
+The virtual environment is at the repository root to keep installed package paths short on Windows. The `.venv` folder is ignored by Git. Verify the imports:
 
-## Set up Hadoop HDFS in WSL
+```powershell
+.\.venv\Scripts\python.exe -c "import numpy, pandas, dask, pymongo, sklearn, tensorflow, xarray, netCDF4, h5py, rasterio; print('Climate libraries are ready')"
+```
 
-The Windows machine is not running as an administrator, so WSL and Ubuntu could not be enabled during this phase. Follow [documentation/hadoop-wsl.md](./documentation/hadoop-wsl.md) to have a Windows administrator install WSL 2 and Ubuntu, configure Hadoop HDFS in Ubuntu, then connect the backend through WebHDFS. CSV imports remain paused until HDFS is configured.
+Dataset uploads are stored under `backend/uploads/` by category by default. The separate CSV-observation import keeps its original files under `data/climate-data/`. MongoDB stores dataset metadata and application records, not the original large files.
 
 ## Common setup errors
 
@@ -176,7 +168,7 @@ The Windows machine is not running as an administrator, so WSL and Ubuntu could 
 - **`JWT_SECRET` is missing or too short:** repeat the `.env` setup above; keep the secret private.
 - **Port 5000 or 5173 is already in use:** close the other app using that port or change `PORT` / the Vite port configuration.
 - **PowerShell says scripts are disabled:** the documented commands do not require changing PowerShell's execution policy; use `npm run dev` directly in each project folder.
-- **Java is still version 8 after installing a newer JDK:** restart VS Code and check `where.exe java`; update the Windows `PATH` so the JDK 17 `bin` folder comes first.
+- **`py -3.13` is not recognized:** install Python 3.13 from the official Python downloads page, then restart VS Code.
 
 ## Existing API routes
 
@@ -187,12 +179,12 @@ The Windows machine is not running as an administrator, so WSL and Ubuntu could 
 - `POST /api/auth/logout` — revoke the signed-in account's existing JWTs.
 - `POST /api/auth/change-password` — change password and invalidate existing tokens.
 - `GET /api/users` and `POST /api/users` — Admin-only account management.
-- `POST /api/datasets/upload`, `GET /api/datasets`, and `GET/DELETE /api/datasets/:id` — Admin-managed dataset metadata; analysts can view it.
+- `POST /api/datasets/upload`, `GET /api/datasets`, and `GET/DELETE /api/datasets/:id` — Admin-managed climate dataset files and metadata; Analysts can list and view datasets.
 - `GET/POST /api/alerts` and `PUT/DELETE /api/alerts/:id` — Admin-managed climate alerts with per-user read status.
 - `GET/POST /api/feedback` and `PUT/DELETE /api/feedback/:id` — user-submitted support requests and Admin management.
 - `GET /api/observations` and `POST /api/observations` — authenticated climate observations.
 - `GET /api/ingestion/uploads` — recent upload history (Analysts see their own; Admins see all).
-- `POST /api/ingestion/uploads` — Admin-only real CSV import to HDFS and MongoDB.
+- `POST /api/ingestion/uploads` — Admin-only CSV import; the original file is stored locally and validated observations plus dataset metadata are stored in MongoDB.
 
 ## Import a climate CSV
 
@@ -207,7 +199,7 @@ weather_station,station-042,2026-11-03T10:00:00Z,34.05,-118.24,temperature,28.4,
 
 Allowed `sourceType` values are `satellite`, `weather_station`, and `environmental_sensor`. Allowed `quality` values are `valid` and `needs_review`. Latitude must be from -90 to 90; longitude must be from -180 to 180.
 
-For this phase, the API parses the upload in memory and stores its observation records plus upload metadata in MongoDB. It does **not** retain the original file or write it to HDFS. HDFS storage and streaming ingestion are later phases.
+The observation import API stores each original CSV below `data/climate-data/uploads/`, validates its rows, and stores observation records plus upload metadata in MongoDB. The dataset upload API stores supported original files under `backend/uploads/satellite/`, `weather/`, `sensors/`, or `historical/`, and saves dataset metadata in MongoDB. Configure those roots with `CLIMATE_STORAGE_DIR` and `DATASET_STORAGE_DIR` in `backend\.env`. Python processing is a later Phase 5 step.
 
 More detailed setup notes are in [documentation/setup.md](./documentation/setup.md).
 The frontend authentication, protected routes, and step-by-step run instructions are in [documentation/frontend-layout.md](./documentation/frontend-layout.md).

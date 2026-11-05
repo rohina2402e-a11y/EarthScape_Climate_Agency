@@ -8,7 +8,7 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
-export default function ClimateUploadPanel({ hdfsConfigured, onError, onImported }) {
+export default function ClimateUploadPanel({ onError, onImported }) {
   const [file, setFile] = useState(null);
   const [uploads, setUploads] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -62,13 +62,8 @@ export default function ClimateUploadPanel({ hdfsConfigured, onError, onImported
               Upload a CSV file. Files are limited to 5 MB and 5,000 observation rows.
             </p>
           </div>
-          <span className="source-label">CSV · HDFS + MongoDB</span>
+          <span className="source-label">CSV · local storage + MongoDB</span>
         </div>
-        {!hdfsConfigured && (
-          <div className="alert alert-warning py-2 small" role="status">
-            CSV imports are paused until the backend is connected to HDFS. No uploaded files will be stored in MongoDB alone.
-          </div>
-        )}
         <form className="row g-3 align-items-end mb-3" onSubmit={submit}>
           <div className="col-md-9">
             <label className="form-label" htmlFor="climateCsv">Climate CSV file</label>
@@ -78,12 +73,12 @@ export default function ClimateUploadPanel({ hdfsConfigured, onError, onImported
               type="file"
               accept=".csv,text/csv"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              disabled={!hdfsConfigured || uploading}
+              disabled={uploading}
               required
             />
           </div>
           <div className="col-md-3 d-grid">
-            <button className="btn btn-forest" type="submit" disabled={!hdfsConfigured || uploading || !file}>
+            <button className="btn btn-forest" type="submit" disabled={uploading || !file}>
               {uploading ? "Importing..." : "Upload and import"}
             </button>
           </div>
@@ -112,7 +107,7 @@ export default function ClimateUploadPanel({ hdfsConfigured, onError, onImported
                   <th scope="col">File</th>
                   <th scope="col">Status</th>
                   <th scope="col">Rows</th>
-                  <th scope="col">Raw CSV in HDFS</th>
+                  <th scope="col">Local file path</th>
                   <th scope="col">Uploaded</th>
                 </tr>
               </thead>
@@ -130,7 +125,7 @@ export default function ClimateUploadPanel({ hdfsConfigured, onError, onImported
                     </td>
                     <td><span className={`upload-status status-${upload.status}`}>{upload.status}</span></td>
                     <td>{upload.recordCount}</td>
-                    <td><code className="hdfs-path">{upload.hdfsPath ?? "—"}</code></td>
+                    <td><code className="storage-path">{upload.storagePath ?? "—"}</code></td>
                     <td className="text-secondary small">{formatDate(upload.createdAt)}</td>
                   </tr>
                 ))}

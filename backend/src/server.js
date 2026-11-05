@@ -1,18 +1,21 @@
 import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
 import { connectToDatabase } from "./config/database.js";
-import { createWebHdfsClient } from "./services/webhdfs.service.js";
+import { createLocalClimateStorage } from "./services/local-climate-storage.service.js";
 
 const port = Number(process.env.PORT ?? 5000);
 const mongoUri = process.env.MONGO_URI ?? "mongodb://127.0.0.1:27017/earthscape_climate";
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 const jwtSecret = process.env.JWT_SECRET;
-const hdfsWebHdfsUrl = process.env.HDFS_WEBHDFS_URL;
-const hdfsUser = process.env.HDFS_USER;
-const hdfsDataNodeHosts = (process.env.HDFS_DATANODE_HOSTS ?? "")
-  .split(",")
-  .map((host) => host.trim())
-  .filter(Boolean);
+const backendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const climateStorageDirectory = process.env.CLIMATE_STORAGE_DIR
+  ? path.resolve(backendDirectory, process.env.CLIMATE_STORAGE_DIR)
+  : path.resolve(backendDirectory, "..", "data", "climate-data");
+const datasetStorageDirectory = process.env.DATASET_STORAGE_DIR
+  ? path.resolve(backendDirectory, process.env.DATASET_STORAGE_DIR)
+  : path.resolve(backendDirectory, "uploads");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid port number.");
@@ -29,19 +32,9 @@ try {
   process.exit(1);
 }
 
-if (Boolean(hdfsWebHdfsUrl) !== Boolean(hdfsUser)) {
-  throw new Error("Set both HDFS_WEBHDFS_URL and HDFS_USER, or leave both empty to disable climate CSV uploads.");
-}
-
-const hdfsClient = hdfsWebHdfsUrl
-  ? createWebHdfsClient({
-    baseUrl: hdfsWebHdfsUrl,
-    username: hdfsUser,
-    allowedDataNodeHosts: hdfsDataNodeHosts
-  })
-  : undefined;
-
-const app = createApp({ frontendOrigin, jwtSecret, hdfsClient });
+const climateStorage = createLocalClimateStorage({ rootDirectory: climateStorageDirectory });
+const datasetStorage = createLocalClimateStorage({ rootDirectory: datasetStorageDirectory });
+const app = createApp({ frontendOrigin, jwtSecret, climateStorage, datasetStorage });
 app.listen(port, () => {
   console.log(`EarthScape API listening on http://localhost:${port}`);
 });

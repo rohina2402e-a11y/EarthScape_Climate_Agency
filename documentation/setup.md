@@ -6,10 +6,9 @@ This guide is for the existing EarthScape repository. It does not create a secon
 
 - `frontend/` contains the Vite React application. It runs in the browser and sends HTTP requests to the API.
 - `backend/` contains the Node.js/Express API. Mongoose connects it to MongoDB.
-- Authenticated climate CSV uploads are validated by the backend and imported as MongoDB observation records. The API keeps upload status and a checksum, but does not keep the original file.
-- `bigdata/` is reserved for Hadoop, MapReduce, Hive, Kafka, and Spark configuration and jobs.
-- `machine-learning/` is reserved for Python scripts, datasets, and model artifacts.
-- MongoDB stores application records. Large raw datasets will use HDFS in a later phase.
+- Authenticated climate CSV uploads are validated by the backend and imported as MongoDB observation records. The original file is kept in local climate storage, and MongoDB stores its metadata and processing status.
+- `machine-learning/` contains the Python dependency manifest and will hold climate processing scripts and model artifacts.
+- MongoDB stores application records and dataset metadata. Admin dataset uploads are stored under `backend/uploads/` by category; the separate observation-import CSV files remain under `data/climate-data/`.
 
 ## Local ports
 
@@ -20,6 +19,62 @@ This guide is for the existing EarthScape repository. It does not create a secon
 | MongoDB | `mongodb://127.0.0.1:27017/earthscape_climate` |
 
 The Vite development proxy sends browser requests beginning with `/api` to the Express API. The browser does not connect directly to MongoDB.
+
+## Set up Python climate processing
+
+Install 64-bit Python 3.13 from the [official Python for Windows downloads page](https://www.python.org/downloads/windows/) if it is not already installed. Open the existing repository folder in VS Code, choose **Terminal → New Terminal**, and use the integrated PowerShell terminal from the repository root:
+
+```powershell
+py -3.13 --version
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements.txt
+.\.venv\Scripts\python.exe -m pip check
+```
+
+The `.venv` virtual environment belongs at the repository root and is ignored by Git. This shorter Windows path avoids path-length problems while installing TensorFlow. Verify the installed climate libraries:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import numpy, pandas, dask, pymongo, sklearn, tensorflow, xarray, netCDF4, h5py, rasterio; print('Climate libraries are ready')"
+```
+
+The packages cover tabular processing, larger-than-memory Dask workloads, MongoDB access, machine learning, NetCDF, HDF5, and GeoTIFF. Python's standard library will handle XML.
+
+The climate reader is in `machine-learning/climate_processing/tabular.py`. It supports CSV, JSON, and XML records; NetCDF grids with time/latitude/longitude coordinates; HDF5 files with same-length named datasets; and GeoTIFF climate bands. Common field names are normalized, invalid or missing values become Pandas missing values, and incomplete records are kept for review. GeoTIFF files need a coordinate reference system and variable names in band descriptions/tags (a single-band file can use its filename). The summary reports missing counts and temperature, rainfall, humidity, wind-speed, and pressure statistics. Values in a dataset must use consistent units; automatic unit conversion is not performed.
+
+Run its tests from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s machine-learning\tests -v
+```
+
+The NetCDF reader expands coordinate grids into location/time records. The GeoTIFF reader makes one record per valid pixel and converts its coordinates to latitude/longitude. These format readers currently use Pandas and can require substantial memory for large grids.
+
+### Process larger climate CSV files with Dask
+
+The Dask loader reads CSV files in partitions and keeps processing lazy until a summary is requested. It accepts both wide CSV files (one row per observation) and the existing long measurement format (one row per measurement). It does not yet scale NetCDF, HDF5, or GeoTIFF reading.
+
+From the repository root, start Python with the `machine-learning/` directory on its import path:
+
+```powershell
+$env:PYTHONPATH = "$PWD\machine-learning"
+.\.venv\Scripts\python.exe
+```
+
+In the Python prompt, load and summarize a large CSV. Replace the example path with the actual dataset path:
+
+```python
+from climate_processing import load_large_climate_csv, summarize_large_climate_data
+
+climate = load_large_climate_csv(
+    r"data\climate-data\uploads\large-observations.csv",
+    blocksize="64MB"
+)
+print(f"Partitions: {climate.npartitions}")
+summary = summarize_large_climate_data(climate)
+print(summary)
+```
+
+`blocksize` controls the approximate size of each input partition; Dask does not load the complete CSV into a single Pandas DataFrame. The summary computes record completeness, missing-value counts, and statistics for temperature, rainfall, humidity, wind speed, and atmospheric pressure. Original files remain in local storage and are not changed by processing.
 
 ## Climate CSV format
 
@@ -136,15 +191,24 @@ These routes require a valid Bearer token. Admin actions also require the Admin 
 | Action | Admin | Analyst |
 |---|---|---|
 | List and view dataset metadata | Yes | Yes |
-| Register dataset metadata with `POST /api/datasets/upload` | Yes | No |
-| Delete dataset metadata | Yes | No |
+| Upload dataset files and save metadata | Yes | No |
+| Delete a dataset and its uploaded file | Yes | No |
 | Read climate alerts | Yes | Yes |
 | Create, edit, or delete climate alerts | Yes | No |
 | Mark alerts read/unread | Own read status | Own read status |
 | Submit feedback and view own requests | Yes | Yes |
 | View all feedback and update/delete requests | Yes | No |
 
-### Test dataset metadata with Thunder Client
+### Upload a climate dataset with Thunder Client
+
+1. Sign in as an Admin and copy the JWT from the login response. Create `POST http://localhost:5000/api/datasets/upload`.
+2. Set the `Authorization` header to `Bearer <Admin JWT>`.
+3. Choose **Body → Multipart Form** and add `name` (Text), `datasetType` (Text; for example `weather_station`), and `file` (File).
+4. Supported dataset types are `satellite`, `weather_station`, `environmental_sensor`, and `historical`. Supported extensions are `.csv`, `.json`, `.xml`, `.nc`, `.nc4`, `.netcdf`, `.h5`, `.hdf5`, `.tif`, and `.tiff`. The upload limit is 100 MB. A successful response is `201 Created` with `processingStatus: "queued"`.
+5. Uploaded files are stored under `backend/uploads/satellite/`, `backend/uploads/weather/`, `backend/uploads/sensors/`, or `backend/uploads/historical/`, based on dataset type. Set `DATASET_STORAGE_DIR` in `backend\.env` to override the default root, `backend/uploads/`.
+6. Either role can call `GET http://localhost:5000/api/datasets` and `GET http://localhost:5000/api/datasets/<id>`. Only Admins can upload or delete; deleting a dataset removes its catalog record and its stored file.
+
+### Obsolete JSON-only metadata example (do not use for file uploads)
 
 1. As an Admin, send `POST http://localhost:5000/api/datasets/upload`, with the Admin JWT as a Bearer token and this JSON body:
 
@@ -156,12 +220,12 @@ These routes require a valid Bearer token. Admin actions also require the Admin 
    }
    ```
 
-   Expected: `201 Created` with a dataset in `queued` status. This endpoint registers metadata only; it does not transmit file contents.
+   This old JSON-only example is superseded. The current endpoint requires the multipart file upload described above.
 2. As either role, send `GET http://localhost:5000/api/datasets` to list dataset metadata, then `GET http://localhost:5000/api/datasets/<id>` to view one record.
 3. As an Analyst, try `POST /api/datasets/upload` or `DELETE /api/datasets/<id>`; each should return `403 Forbidden`.
-4. As an Admin, send `DELETE /api/datasets/<id>` to remove the metadata record. Removing metadata does not delete climate observations or files already stored in HDFS.
+4. The current Admin delete endpoint removes a newly uploaded dataset file and its catalog record. The separate observation-import workflow keeps its observation records and original files in local climate storage.
 
-For an actual CSV observation import, use `POST http://localhost:5000/api/ingestion/uploads` with **Body → Multipart Form**, field name `file`, and a `.csv` file. This is Admin-only, accepts one CSV up to 5 MB, validates up to 5,000 rows, requires HDFS to be configured, writes the observations to MongoDB, and stores the original file in HDFS. A successful import also creates a dataset catalog record. If HDFS is not configured, this real-file endpoint returns `503`; use the CSV format described above.
+For an actual CSV observation import, use `POST http://localhost:5000/api/ingestion/uploads` with **Body → Multipart Form**, field name `file`, and a `.csv` file. This is Admin-only, accepts one CSV up to 5 MB, validates up to 5,000 rows, stores the original file under `data/climate-data/uploads/`, and writes observations and dataset metadata to MongoDB. A successful import also creates a dataset catalog record. If local climate storage is not configured, the endpoint returns `503`.
 
 ### Test alerts with Thunder Client
 
@@ -201,6 +265,6 @@ For an actual CSV observation import, use `POST http://localhost:5000/api/ingest
 
 The Climate Data, Notifications, and Feedback & Support pages use these APIs. Climate measurements, forecasts, visualizations, and other dashboard examples remain illustrative; this work does not connect prediction pages to a trained model.
 
-## Big-data and ML prerequisites
+## Climate dataset storage
 
-Install Java and Python directly on the operating system, not in containers. Use compatible 64-bit versions selected for the Hadoop, Hive, Spark, Kafka, and TensorFlow versions chosen in later phases. The current machine's Java 8 (32-bit) and Python 3.14 should not be assumed compatible with the complete toolchain.
+The backend stores uploaded original files in the local `data/climate-data/` directory by default. Change `CLIMATE_STORAGE_DIR` in `backend\.env` to select another local directory. Dataset metadata and processed observation records stay in MongoDB; deleting a metadata record does not delete the original file or observation records.

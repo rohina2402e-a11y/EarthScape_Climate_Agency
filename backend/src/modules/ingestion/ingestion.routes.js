@@ -8,7 +8,7 @@ import { Observation } from "../observations/observation.model.js";
 import { Dataset } from "../datasets/dataset.model.js";
 import { ClimateCsvError, parseClimateCsv } from "./climate-csv.js";
 import { ClimateUpload } from "./climate-upload.model.js";
-import { WebHdfsError } from "../../services/webhdfs.service.js";
+import { LocalClimateStorageError } from "../../services/local-climate-storage.service.js";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const uploadFile = multer({
@@ -25,7 +25,7 @@ function displayFilename(originalname) {
     .slice(0, 200);
 }
 
-export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
+export default function ingestionRoutes({ jwtSecret, climateStorage }) {
   const router = Router();
   router.use(requireAuth({ jwtSecret }), requirePasswordUpdated);
 
@@ -47,9 +47,9 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
     if (!request.file) {
       return response.status(400).json({ error: "Choose a .csv file to upload." });
     }
-    if (!hdfsClient) {
+    if (!climateStorage) {
       return response.status(503).json({
-        error: "HDFS storage is not configured. Set HDFS_WEBHDFS_URL and HDFS_USER, then restart the backend."
+        error: "Local climate file storage is not configured."
       });
     }
 
@@ -98,10 +98,14 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
         });
       }
 
-      const hdfsPath = `/earthscape/uploads/${request.user._id}/${upload._id}-${sha256}.csv`;
-      upload.hdfsPath = hdfsPath;
+      const storagePath = path.posix.join(
+        "uploads",
+        request.user._id.toString(),
+        `${upload._id}-${sha256}.csv`
+      );
+      upload.storagePath = storagePath;
       await upload.save();
-      await hdfsClient.writeFile(hdfsPath, request.file.buffer);
+      await climateStorage.writeFile(storagePath, request.file.buffer);
 
       await Observation.insertMany(
         observations.map((observation) => ({ ...observation, uploadId: upload._id })),
@@ -110,7 +114,6 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
 
       upload.status = "completed";
       upload.recordCount = observations.length;
-      upload.hdfsPath = hdfsPath;
       await upload.save();
 
       const sourceTypes = [...new Set(observations.map((observation) => observation.sourceType))];
@@ -121,7 +124,7 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
         uploadedBy: request.user._id,
         processingStatus: "processed",
         recordCount: observations.length,
-        storagePath: hdfsPath,
+        storagePath,
         uploadId: upload._id
       });
 
@@ -137,14 +140,14 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
           });
         }
 
-        if (upload.hdfsPath) {
+        if (upload.storagePath) {
           try {
-            await hdfsClient.deleteFile(upload.hdfsPath);
-            upload.hdfsPath = undefined;
+            await climateStorage.deleteFile(upload.storagePath);
+            upload.storagePath = undefined;
           } catch (cleanupError) {
-            console.error("Could not remove the HDFS file from an incomplete climate data import.", {
+            console.error("Could not remove the local file from an incomplete climate data import.", {
               uploadId: upload._id.toString(),
-              hdfsPath: upload.hdfsPath,
+              storagePath: upload.storagePath,
               cleanupError
             });
           }
@@ -165,14 +168,14 @@ export default function ingestionRoutes({ jwtSecret, hdfsClient }) {
       if (error instanceof mongoose.Error.ValidationError || error instanceof mongoose.Error.CastError) {
         return response.status(400).json({ error: error.message });
       }
-      if (error instanceof WebHdfsError) {
+      if (error instanceof LocalClimateStorageError) {
         if (upload) {
           upload.status = "failed";
           upload.errorMessage = error.message.slice(0, 500);
           await upload.save();
         }
         return response.status(error.statusCode).json({
-          error: "Could not store the original CSV in HDFS.",
+          error: "Could not store the original CSV in local climate storage.",
           details: error.message,
           upload: upload?.toObject()
         });

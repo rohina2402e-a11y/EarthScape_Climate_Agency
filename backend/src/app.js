@@ -10,7 +10,7 @@ import ingestionRoutes from "./modules/ingestion/ingestion.routes.js";
 import observationRoutes from "./modules/observations/observation.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 
-export function createApp({ frontendOrigin, jwtSecret, hdfsClient }) {
+export function createApp({ frontendOrigin, jwtSecret, climateStorage, datasetStorage }) {
   const app = express();
 
   app.use(cors({ origin: frontendOrigin }));
@@ -20,25 +20,29 @@ export function createApp({ frontendOrigin, jwtSecret, hdfsClient }) {
     const connected = mongoose.connection.readyState === 1;
     response.status(connected ? 200 : 503).json({
       status: connected ? "ok" : "unavailable",
-      database: connected ? "connected" : "disconnected",
-      hdfs: hdfsClient ? "configured" : "unconfigured"
+      database: connected ? "connected" : "disconnected"
     });
   });
 
   app.use("/api/auth", authRoutes({ jwtSecret }));
-  app.use("/api/datasets", datasetRoutes({ jwtSecret }));
+  app.use("/api/datasets", datasetRoutes({ jwtSecret, datasetStorage }));
   app.use("/api/alerts", alertRoutes({ jwtSecret }));
   app.use("/api/feedback", feedbackRoutes({ jwtSecret }));
   app.use("/api/users", userRoutes({ jwtSecret }));
   app.use("/api/observations", observationRoutes({ jwtSecret }));
-  app.use("/api/ingestion", ingestionRoutes({ jwtSecret, hdfsClient }));
+  app.use("/api/ingestion", ingestionRoutes({ jwtSecret, climateStorage }));
 
-  app.use((error, _request, response, _next) => {
+  app.use((error, request, response, _next) => {
     if (error instanceof multer.MulterError) {
       const status = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+      const datasetUpload = request.originalUrl.startsWith("/api/datasets/upload");
       const message = error.code === "LIMIT_FILE_SIZE"
-        ? "CSV file exceeds the 5 MB upload limit."
-        : "Upload must contain exactly one CSV file and no additional fields.";
+        ? datasetUpload
+          ? "Dataset file exceeds the 100 MB upload limit."
+          : "CSV file exceeds the 5 MB upload limit."
+        : datasetUpload
+          ? "Upload must contain exactly one file and only the supported dataset fields."
+          : "Upload must contain exactly one CSV file and no additional fields.";
       return response.status(status).json({ error: message });
     }
 
