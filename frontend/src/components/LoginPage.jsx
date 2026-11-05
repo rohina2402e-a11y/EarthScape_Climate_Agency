@@ -42,54 +42,50 @@ export default function LoginPage({ onLogin, message }) {
   }
 
   return (
-    <main className="login-shell">
-      <section className="card panel-card login-card">
-        <div className="card-body p-4 p-md-5">
-          <div className="login-brand mb-4">
-            <span className="brand-mark" aria-hidden="true">E</span>
-            <span>EarthScape <span className="brand-subtitle">Climate Agency</span></span>
-          </div>
-          <p className="eyebrow mb-2">CLIMATE DATA WORKSPACE</p>
-          <h1 className="h3 mb-2">Welcome back</h1>
-          <p className="text-secondary mb-4">Sign in to your climate monitoring workspace.</p>
+    <main className="auth-page">
+      <section aria-labelledby="login-heading" className="auth-card">
+        <Link aria-label="EarthScape home" className="auth-brand" to="/">
+          <span aria-hidden="true" className="auth-brand-mark">E</span>
+          <span>EarthScape <small>Climate Agency</small></span>
+        </Link>
+        <p className="eyebrow">CLIMATE DATA WORKSPACE</p>
+        <h1 id="login-heading">Welcome back</h1>
+        <p className="auth-description">Sign in to your climate monitoring workspace.</p>
 
-          {error && <div className="alert alert-danger" role="alert">{error}</div>}
+        {error && <div className="alert alert-danger" role="alert">{error}</div>}
 
-          <form onSubmit={submit}>
-            <div className="mb-3">
-              <label className="form-label" htmlFor="loginEmail">Email address</label>
-              <input
-                autoComplete="username"
-                className="form-control"
-                id="loginEmail"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                maxLength="254"
-                required
-              />
-            </div>
-            <div className="mb-4">
-              <label className="form-label" htmlFor="loginPassword">Password</label>
-              <input
-                autoComplete="current-password"
-                className="form-control"
-                id="loginPassword"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                maxLength="72"
-                required
-              />
-            </div>
-            <button className="btn btn-forest w-100" type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
-          <p className="auth-page-footer">
-            New to EarthScape? <Link to="/register">Create an Analyst account</Link>
-          </p>
-        </div>
+        <form className="auth-form" onSubmit={submit}>
+          <label>
+            <span>Email address</span>
+            <input
+              autoComplete="username"
+              id="loginEmail"
+              maxLength={254}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+              type="email"
+              value={email}
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              autoComplete="current-password"
+              id="loginPassword"
+              maxLength={72}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type="password"
+              value={password}
+            />
+          </label>
+          <button className="auth-submit" disabled={loading} type="submit">
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+        <p className="auth-page-footer">
+          New to EarthScape? <Link to="/register">Create an Analyst account</Link>
+        </p>
       </section>
     </main>
   );
