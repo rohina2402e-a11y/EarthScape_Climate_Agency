@@ -10,7 +10,7 @@ import { ClimateCsvError, parseClimateCsv } from "./climate-csv.js";
 import { ClimateUpload } from "./climate-upload.model.js";
 import { LocalClimateStorageError } from "../../services/local-climate-storage.service.js";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = process.env.VERCEL ? 4 * 1024 * 1024 : 5 * 1024 * 1024;
 const uploadFile = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: 1, fields: 0, parts: 1 },

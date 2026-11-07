@@ -43,7 +43,7 @@ The reusable climate reader is in `machine-learning/climate_processing/tabular.p
 
 ### Process uploaded CSV and JSON datasets
 
-The admin dataset upload endpoint stores the original file under `backend/uploads/` and leaves it unchanged. CSV and JSON uploads are then sent from Express to `machine-learning/scripts/process_dataset.py`. Python normalizes date and numeric fields, removes duplicate rows and invalid dates, marks out-of-range measurements as missing, calculates measurement statistics and monthly/yearly trends, and uses scikit-learn Isolation Forest to flag unusual records. Express saves the summary, cleaning counts, and up to 100 example anomalies in the MongoDB dataset document. The processing status advances through `queued` and `processing` to `completed`, or becomes `failed` with an error message. Other accepted file formats remain queued because this processing pipeline handles CSV and JSON.
+The admin dataset upload endpoint stores the original file locally and leaves its content unchanged. CSV and JSON uploads are then sent from Express to the internal FastAPI service in `machine-learning/api/index.py`. Python normalizes date and numeric fields, removes duplicate rows and invalid dates, marks out-of-range measurements as missing, calculates measurement statistics and monthly/yearly trends, and uses scikit-learn Isolation Forest to flag unusual records. Express saves the summary, cleaning counts, and up to 100 example anomalies in the MongoDB dataset document. The processing status advances through `queued` and `processing` to `completed`, or becomes `failed` with an error message. Other accepted file formats remain queued because this processing pipeline handles CSV and JSON.
 
 Run the processor directly against the included sample file without changing it:
 
@@ -51,7 +51,26 @@ Run the processor directly against the included sample file without changing it:
 .\.venv\Scripts\python.exe machine-learning\scripts\process_dataset.py machine-learning\datasets\sample-climate.csv
 ```
 
-The script prints one JSON result containing `record_count`, `cleaning`, `summary.statistics`, `summary.monthly_trends`, `summary.yearly_trends`, and `anomalies`. The API uses the root `.venv` Python executable by default on Windows. Set `PYTHON_EXECUTABLE` in `backend\.env` only if Python is installed elsewhere; use an absolute path, for example `C:\Python313\python.exe`.
+The script prints one JSON result containing `record_count`, `cleaning`, `summary.statistics`, `summary.monthly_trends`, `summary.yearly_trends`, and `anomalies`.
+
+### Deploy the existing app as Vercel services
+
+The root `vercel.json` declares three services. `backend` (Express) receives public `/api/...` requests and has a private service binding to `machine-learning` (FastAPI) using `CLIMATE_PROCESSOR_URL`. `frontend` (Vite) receives all remaining paths. The Python service has no public rewrite; the React app calls the public Express routes through relative `/api/...` URLs. Vercel injects the binding at runtime; do not add `CLIMATE_PROCESSOR_URL` to Vercel environment variables.
+
+Set `MONGO_URI` and `JWT_SECRET` in Vercel's project environment settings for each deployment environment. `JWT_SECRET` must be at least 32 bytes. `FRONTEND_ORIGIN` can be set to the public frontend origin; same-origin requests do not require CORS. Test the services locally from the repository root with:
+
+```powershell
+npx vercel dev
+```
+
+Then open `http://localhost:3000` and check `http://localhost:3000/api/health`. For regular local development without Vercel CLI, install the Python API dependencies and start the internal service in a second terminal:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\api\requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn api.index:app --app-dir machine-learning --host 127.0.0.1 --port 8000
+```
+
+When deployed to Vercel, HTTP uploads are limited to 4 MB to stay below the Functions request-body limit; local Express keeps its existing larger limits. Important: the current backend file store uses local disk. On Vercel, uploads are temporarily placed under `/tmp`, which is not durable or shared between function instances. Configure durable object storage (for example Vercel Blob or S3) before relying on uploaded originals in production; MongoDB persists dataset metadata and processing summaries, not the uploaded file contents.
 
 To upload a dataset while the backend and MongoDB are running, replace `<ADMIN_TOKEN>` with a valid admin access token and run this from the repository root:
 

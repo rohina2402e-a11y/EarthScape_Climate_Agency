@@ -1,4 +1,4 @@
-import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export class LocalClimateStorageError extends Error {
@@ -59,6 +59,18 @@ export function createLocalClimateStorage({ rootDirectory }) {
       } catch (error) {
         const code = error.code ? ` (${error.code})` : "";
         throw new LocalClimateStorageError(`Could not write climate file to local storage${code}.`, {
+          cause: error
+        });
+      }
+    },
+
+    async readFile(storagePath) {
+      const targetPath = resolveStoragePath(storagePath);
+      try {
+        return await readFile(targetPath);
+      } catch (error) {
+        const code = error.code ? ` (${error.code})` : "";
+        throw new LocalClimateStorageError(`Could not read climate file from local storage${code}.`, {
           cause: error
         });
       }

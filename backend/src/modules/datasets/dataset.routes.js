@@ -8,7 +8,7 @@ import { requireAuth, requirePasswordUpdated, requireRole } from "../../middlewa
 import { Dataset, publicDataset } from "./dataset.model.js";
 import { LocalClimateStorageError } from "../../services/local-climate-storage.service.js";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = process.env.VERCEL ? 4 * 1024 * 1024 : 100 * 1024 * 1024;
 const FORMAT_BY_EXTENSION = new Map([
   [".csv", "CSV"],
   [".json", "JSON"],
@@ -158,7 +158,8 @@ export default function datasetRoutes({ jwtSecret, datasetStorage, climateProces
         dataset.processingStatus = "processing";
         await dataset.save();
         try {
-          const processingResults = await climateProcessor(storagePath);
+          const content = await datasetStorage.readFile(storagePath);
+          const processingResults = await climateProcessor({ content, fileFormat });
           dataset.processingResults = processingResults;
           dataset.recordCount = processingResults.record_count;
           dataset.processingStatus = "completed";

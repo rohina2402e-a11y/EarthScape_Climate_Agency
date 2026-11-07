@@ -18,6 +18,7 @@ test("local climate storage creates directories, writes files, and deletes files
 
   await storage.writeFile(filePath, Buffer.from("temperature\n22"));
   assert.equal(await readFile(path.join(rootDirectory, filePath), "utf8"), "temperature\n22");
+  assert.equal((await storage.readFile(filePath)).toString("utf8"), "temperature\n22");
 
   await storage.deleteFile(filePath);
   await assert.rejects(readFile(path.join(rootDirectory, filePath)));

@@ -44,8 +44,8 @@ export function createApp({
       const datasetUpload = request.originalUrl.startsWith("/api/datasets/upload");
       const message = error.code === "LIMIT_FILE_SIZE"
         ? datasetUpload
-          ? "Dataset file exceeds the 100 MB upload limit."
-          : "CSV file exceeds the 5 MB upload limit."
+          ? `Dataset file exceeds the ${process.env.VERCEL ? "4 MB" : "100 MB"} upload limit.`
+          : `CSV file exceeds the ${process.env.VERCEL ? "4 MB" : "5 MB"} upload limit.`
         : datasetUpload
           ? "Upload must contain exactly one file and only the supported dataset fields."
           : "Upload must contain exactly one CSV file and no additional fields.";

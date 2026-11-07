@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
@@ -11,19 +12,20 @@ const mongoUri = process.env.MONGO_URI ?? "mongodb://127.0.0.1:27017/earthscape_
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 const jwtSecret = process.env.JWT_SECRET;
 const backendDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const deploymentStorageRoot = process.env.VERCEL
+  ? path.join(tmpdir(), "earthscape-climate")
+  : null;
 const climateStorageDirectory = process.env.CLIMATE_STORAGE_DIR
   ? path.resolve(backendDirectory, process.env.CLIMATE_STORAGE_DIR)
-  : path.resolve(backendDirectory, "..", "data", "climate-data");
+  : deploymentStorageRoot
+    ? path.join(deploymentStorageRoot, "observations")
+    : path.resolve(backendDirectory, "..", "data", "climate-data");
 const datasetStorageDirectory = process.env.DATASET_STORAGE_DIR
   ? path.resolve(backendDirectory, process.env.DATASET_STORAGE_DIR)
-  : path.resolve(backendDirectory, "uploads");
-const defaultPythonExecutable = process.platform === "win32"
-  ? path.resolve(backendDirectory, "..", ".venv", "Scripts", "python.exe")
-  : path.resolve(backendDirectory, "..", ".venv", "bin", "python");
-const climateProcessor = createClimateProcessor({
-  pythonExecutable: process.env.PYTHON_EXECUTABLE ?? defaultPythonExecutable,
-  dataDirectory: datasetStorageDirectory
-});
+  : deploymentStorageRoot
+    ? path.join(deploymentStorageRoot, "datasets")
+    : path.resolve(backendDirectory, "uploads");
+const climateProcessor = createClimateProcessor();
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid port number.");

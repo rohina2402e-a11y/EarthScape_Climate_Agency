@@ -8,11 +8,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import rasterio
-import xarray as xr
-from rasterio.warp import transform as transform_coordinates
-
-import h5py
 
 
 class ClimateDataError(ValueError):
@@ -152,12 +147,16 @@ def _read_json(path: Path) -> pd.DataFrame:
 
 def _read_netcdf(path: Path) -> pd.DataFrame:
     try:
+        import xarray as xr
+
         with xr.open_dataset(path) as dataset:
             if not dataset.data_vars:
                 raise ClimateDataError("The NetCDF file does not contain climate variables.")
             return dataset.to_dataframe().reset_index()
     except ClimateDataError:
         raise
+    except ImportError as error:
+        raise ClimateDataError("Reading NetCDF files requires xarray.") from error
     except (OSError, ValueError, TypeError) as error:
         raise ClimateDataError(f"Could not read NetCDF climate data: {error}") from error
 
@@ -175,6 +174,11 @@ def _decode_hdf5_values(values: np.ndarray) -> np.ndarray:
 
 
 def _read_hdf5(path: Path) -> pd.DataFrame:
+    try:
+        import h5py
+    except ImportError as error:
+        raise ClimateDataError("Reading HDF5 files requires h5py.") from error
+
     fields: dict[str, np.ndarray] = {}
     try:
         with h5py.File(path, "r") as source:
@@ -221,6 +225,12 @@ def _tag_value(tags: dict[str, str], *names: str) -> str | None:
 
 
 def _read_geotiff(path: Path) -> pd.DataFrame:
+    try:
+        import rasterio
+        from rasterio.warp import transform as transform_coordinates
+    except ImportError as error:
+        raise ClimateDataError("Reading GeoTIFF files requires rasterio.") from error
+
     try:
         with rasterio.open(path) as dataset:
             if dataset.count < 1:

@@ -1,11 +1,3 @@
-import { execFile } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const PROCESSING_SCRIPT = fileURLToPath(
-  new URL("../../../machine-learning/scripts/process_dataset.py", import.meta.url)
-);
-
 export class ClimateProcessingError extends Error {
   constructor(message, options) {
     super(message, options);
@@ -13,66 +5,43 @@ export class ClimateProcessingError extends Error {
   }
 }
 
-export function createClimateProcessor({ pythonExecutable = "python", dataDirectory }) {
-  if (!dataDirectory) {
-    throw new Error("A climate dataset storage directory is required.");
-  }
-  const resolvedDataDirectory = path.resolve(dataDirectory);
-
-  return async function processClimateDataset(storagePath) {
-    if (
-      typeof storagePath !== "string" ||
-      !storagePath.trim() ||
-      storagePath.split(/[\\/]/).some((part) => !part || part === "." || part === "..")
-    ) {
-      throw new Error("Climate dataset paths must be relative paths without traversal segments.");
+export function createClimateProcessor({
+  getServiceUrl = () => process.env.CLIMATE_PROCESSOR_URL
+    ?? (process.env.VERCEL ? undefined : "http://127.0.0.1:8000/")
+} = {}) {
+  return async function processClimateDataset({ content, fileFormat }) {
+    const serviceUrl = getServiceUrl();
+    if (!serviceUrl) {
+      throw new ClimateProcessingError("The climate processor service binding is not configured.");
+    }
+    if (!["CSV", "JSON"].includes(fileFormat)) {
+      throw new ClimateProcessingError("The Python processor supports CSV and JSON files only.");
     }
 
-    const filePath = path.resolve(resolvedDataDirectory, ...storagePath.split(/[\\/]/));
-    const relativePath = path.relative(resolvedDataDirectory, filePath);
-    if (relativePath.startsWith(`..${path.sep}`) || relativePath === ".." || path.isAbsolute(relativePath)) {
-      throw new Error("Climate dataset paths must remain inside the configured storage directory.");
-    }
-
-    let stdout;
     try {
-      ({ stdout } = await new Promise((resolve, reject) => {
-        execFile(
-          pythonExecutable,
-          [PROCESSING_SCRIPT, filePath],
-          { timeout: 120_000, maxBuffer: 10 * 1024 * 1024, windowsHide: true },
-          (error, output, stderr) => {
-            if (error) {
-              if (error.code === "ENOENT") {
-                reject(error);
-                return;
-              }
-              const details = stderr.trim().slice(0, 1000);
-              reject(new ClimateProcessingError(
-                details || "The Python climate processor exited unsuccessfully.",
-                { cause: error }
-              ));
-              return;
-            }
-            resolve({ stdout: output });
-          }
-        );
-      }));
-      return JSON.parse(stdout);
-    } catch (error) {
-      if (error instanceof ClimateProcessingError) throw error;
-      if (error instanceof SyntaxError) {
-        throw new ClimateProcessingError("The Python climate processor returned invalid JSON.", {
+      const response = await fetch(new URL("/process", serviceUrl), {
+        method: "POST",
+        headers: { "X-Climate-File-Format": fileFormat },
+        body: content,
+        signal: AbortSignal.timeout(120_000)
+      });
+      let result;
+      try {
+        result = await response.json();
+      } catch (error) {
+        throw new ClimateProcessingError("The Python processor returned an invalid response.", {
           cause: error
         });
       }
-      if (error.code === "ENOENT") {
+      if (!response.ok) {
         throw new ClimateProcessingError(
-          `Python executable "${pythonExecutable}" was not found. Configure PYTHON_EXECUTABLE.`,
-          { cause: error }
+          result.detail ?? "The Python climate processor rejected the uploaded file."
         );
       }
-      throw new ClimateProcessingError("Could not run the Python climate processor.", {
+      return result;
+    } catch (error) {
+      if (error instanceof ClimateProcessingError) throw error;
+      throw new ClimateProcessingError("Could not reach the Python climate processor service.", {
         cause: error
       });
     }
