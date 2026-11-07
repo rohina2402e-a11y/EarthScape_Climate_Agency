@@ -345,6 +345,11 @@
   color: #588268;
 }
 
+.dataset-status-completed {
+  background: #edf5ef;
+  color: #588268;
+}
+
 .dataset-status-queued,
 .dataset-status-processing {
   background: #edf2f5;

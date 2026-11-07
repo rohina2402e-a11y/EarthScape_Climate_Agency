@@ -7,7 +7,7 @@ This guide is for the existing EarthScape repository. It does not create a secon
 - `frontend/` contains the Vite React application. It runs in the browser and sends HTTP requests to the API.
 - `backend/` contains the Node.js/Express API. Mongoose connects it to MongoDB.
 - Authenticated climate CSV uploads are validated by the backend and imported as MongoDB observation records. The original file is kept in local climate storage, and MongoDB stores its metadata and processing status.
-- `machine-learning/` contains the Python dependency manifest and will hold climate processing scripts and model artifacts.
+- `machine-learning/` contains the reusable Python climate processors, command-line scripts, tests, and model artifacts.
 - MongoDB stores application records and dataset metadata. Admin dataset uploads are stored under `backend/uploads/` by category; the separate observation-import CSV files remain under `data/climate-data/`.
 
 ## Local ports
@@ -40,6 +40,30 @@ The `.venv` virtual environment belongs at the repository root and is ignored by
 The packages cover tabular processing, larger-than-memory Dask workloads, MongoDB access, machine learning, NetCDF, HDF5, and GeoTIFF. Python's standard library will handle XML.
 
 The reusable climate reader is in `machine-learning/climate_processing/tabular.py`. It supports CSV, JSON, and XML records; NetCDF grids with time/latitude/longitude coordinates; HDF5 files with same-length named datasets; and GeoTIFF climate bands. Common field names are normalized, invalid or missing values become Pandas missing values, and incomplete records are kept for review. GeoTIFF files need a coordinate reference system and variable names in band descriptions/tags (a single-band file can use its filename). The analysis reports missing counts and percentages, temperature/rainfall/humidity/wind-speed/pressure statistics, and monthly and yearly trends. Values in a dataset must use consistent units; automatic unit conversion is not performed.
+
+### Process uploaded CSV and JSON datasets
+
+The admin dataset upload endpoint stores the original file under `backend/uploads/` and leaves it unchanged. CSV and JSON uploads are then sent from Express to `machine-learning/scripts/process_dataset.py`. Python normalizes date and numeric fields, removes duplicate rows and invalid dates, marks out-of-range measurements as missing, calculates measurement statistics and monthly/yearly trends, and uses scikit-learn Isolation Forest to flag unusual records. Express saves the summary, cleaning counts, and up to 100 example anomalies in the MongoDB dataset document. The processing status advances through `queued` and `processing` to `completed`, or becomes `failed` with an error message. Other accepted file formats remain queued because this processing pipeline handles CSV and JSON.
+
+Run the processor directly against the included sample file without changing it:
+
+```powershell
+.\.venv\Scripts\python.exe machine-learning\scripts\process_dataset.py machine-learning\datasets\sample-climate.csv
+```
+
+The script prints one JSON result containing `record_count`, `cleaning`, `summary.statistics`, `summary.monthly_trends`, `summary.yearly_trends`, and `anomalies`. The API uses the root `.venv` Python executable by default on Windows. Set `PYTHON_EXECUTABLE` in `backend\.env` only if Python is installed elsewhere; use an absolute path, for example `C:\Python313\python.exe`.
+
+To upload a dataset while the backend and MongoDB are running, replace `<ADMIN_TOKEN>` with a valid admin access token and run this from the repository root:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/datasets/upload `
+  -H "Authorization: Bearer <ADMIN_TOKEN>" `
+  -F "file=@machine-learning\datasets\sample-climate.csv" `
+  -F "name=Sample climate dataset" `
+  -F "datasetType=weather_station"
+```
+
+The response contains the dataset `processingStatus`, `recordCount`, `processingResults`, and (if processing fails) `processingError`. Check the status later with `GET /api/datasets/<dataset-id>` using the same bearer token. CSV or JSON needs an observation date column such as `observedAt` or `date`; recognized measurement columns include temperature, rainfall/precipitation, and humidity. Missing measurement values are kept as missing rather than deleting the whole observation. CSV/JSON processing requires no additional backend npm package.
 
 Run the standalone readers or clean/analyze a dataset from the repository root. First try the included sample file:
 

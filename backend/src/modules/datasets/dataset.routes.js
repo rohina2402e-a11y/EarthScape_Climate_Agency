@@ -59,7 +59,7 @@ function createDatasetUpload(datasetStorage) {
   }).single("file");
 }
 
-export default function datasetRoutes({ jwtSecret, datasetStorage }) {
+export default function datasetRoutes({ jwtSecret, datasetStorage, climateProcessor }) {
   const router = Router();
   router.use(requireAuth({ jwtSecret }), requirePasswordUpdated);
 
@@ -139,10 +139,11 @@ export default function datasetRoutes({ jwtSecret, datasetStorage }) {
       `${randomUUID()}${extension}`
     );
     let fileMoved = false;
+    let dataset;
     try {
       await datasetStorage.moveFile(request.file.path, storagePath);
       fileMoved = true;
-      const dataset = await Dataset.create({
+      dataset = await Dataset.create({
         name,
         datasetType,
         fileFormat,
@@ -152,16 +153,41 @@ export default function datasetRoutes({ jwtSecret, datasetStorage }) {
         processingStatus: "queued",
         storagePath
       });
+
+      if (climateProcessor && ["CSV", "JSON"].includes(fileFormat)) {
+        dataset.processingStatus = "processing";
+        await dataset.save();
+        try {
+          const processingResults = await climateProcessor(storagePath);
+          dataset.processingResults = processingResults;
+          dataset.recordCount = processingResults.record_count;
+          dataset.processingStatus = "completed";
+          dataset.processingError = undefined;
+        } catch (processingError) {
+          console.error("Climate dataset processing failed.", {
+            datasetId: dataset._id.toString(),
+            processingError
+          });
+          dataset.processingStatus = "failed";
+          dataset.processingError = (
+            processingError instanceof Error ? processingError.message : String(processingError)
+          ).slice(0, 500);
+        }
+        await dataset.save();
+      }
+
       return response.status(201).json({ dataset: publicDataset(dataset) });
     } catch (error) {
-      try {
-        if (fileMoved) await datasetStorage.deleteFile(storagePath);
-        else await datasetStorage.deleteStagedFile(request.file.filename);
-      } catch (cleanupError) {
-        console.error("Could not clean up an incomplete dataset upload.", {
-          storagePath,
-          cleanupError
-        });
+      if (!dataset) {
+        try {
+          if (fileMoved) await datasetStorage.deleteFile(storagePath);
+          else await datasetStorage.deleteStagedFile(request.file.filename);
+        } catch (cleanupError) {
+          console.error("Could not clean up an incomplete dataset upload.", {
+            storagePath,
+            cleanupError
+          });
+        }
       }
 
       if (error instanceof LocalClimateStorageError) {

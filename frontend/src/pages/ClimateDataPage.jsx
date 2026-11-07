@@ -14,6 +14,7 @@ const formatLabels = { NETCDF: "NetCDF", GEOTIFF: "GeoTIFF" };
 const statusLabels = {
   queued: "Queued",
   processing: "Processing",
+  completed: "Completed",
   processed: "Processed",
   failed: "Failed",
   needs_review: "Under review"

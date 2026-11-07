@@ -6,6 +6,7 @@ from .tabular import (
     normalize_climate_data
 )
 from .large_data import load_large_climate_csv, normalize_large_climate_data, summarize_large_climate_data
+from .processing import process_climate_file
 
 __all__ = [
     "ClimateDataError",
@@ -15,5 +16,6 @@ __all__ = [
     "normalize_large_climate_data",
     "load_tabular_climate_file",
     "normalize_climate_data",
-    "summarize_large_climate_data"
+    "summarize_large_climate_data",
+    "process_climate_file"
 ]

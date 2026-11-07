@@ -17,7 +17,8 @@ from climate_processing import (  # noqa: E402
     ClimateDataError,
     climate_data_summary,
     load_climate_file,
-    load_tabular_climate_file
+    load_tabular_climate_file,
+    process_climate_file
 )
 
 
@@ -142,6 +143,62 @@ class TabularClimateTests(unittest.TestCase):
     def test_unsupported_format_returns_a_clear_error(self) -> None:
         with self.assertRaisesRegex(ClimateDataError, "Unsupported tabular climate format"):
             load_tabular_climate_file("unknown.bin")
+
+    def test_processing_removes_duplicates_invalid_dates_and_invalid_measurements(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "processing.csv"
+            path.write_text(
+                "observedAt,location,temperature,rainfall,humidity\n"
+                "2026-01-01T00:00:00Z,Harbor,20,1,50\n"
+                "2026-01-01T00:00:00Z,Harbor,20,1,50\n"
+                "not-a-date,Harbor,18,0,45\n"
+                "2026-01-02T00:00:00Z,Harbor,20,-1,120\n"
+                "2026-01-03T00:00:00Z,Harbor,21,2,55\n",
+                encoding="utf-8"
+            )
+            result = process_climate_file(path)
+
+        self.assertEqual(result["record_count"], 3)
+        self.assertEqual(result["cleaning"]["duplicate_records_removed"], 1)
+        self.assertEqual(result["cleaning"]["invalid_date_records_removed"], 1)
+        self.assertEqual(
+            result["cleaning"]["invalid_measurements_replaced_with_missing"]["rainfall"],
+            1
+        )
+        self.assertEqual(
+            result["cleaning"]["invalid_measurements_replaced_with_missing"]["humidity"],
+            1
+        )
+        self.assertAlmostEqual(result["summary"]["statistics"]["temperature"]["mean"], 20.3333333333)
+        self.assertEqual(result["summary"]["statistics"]["rainfall"]["count"], 2)
+
+    def test_processing_reads_json_and_reports_outliers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "processing.json"
+            path.write_text(
+                json.dumps({"observations": [
+                    {
+                        "observedAt": f"2026-01-{day:02d}T00:00:00Z",
+                        "temperature": temperature,
+                        "rainfall": 1,
+                        "humidity": 50
+                    }
+                    for day, temperature in (
+                        (1, 18), (2, 19), (3, 18), (4, 20),                         (5, 62)
+                    )
+                ]}),
+                encoding="utf-8"
+            )
+            result = process_climate_file(path)
+
+        self.assertEqual(result["record_count"], 5)
+        self.assertEqual(result["summary"]["statistics"]["temperature"]["maximum"], 62.0)
+        self.assertGreaterEqual(result["anomaly_count"], 1)
+        self.assertTrue(all(anomaly["record_index"] >= 0 for anomaly in result["anomalies"]))
+
+    def test_processing_rejects_non_csv_json_files(self) -> None:
+        with self.assertRaisesRegex(ClimateDataError, "supports CSV and JSON"):
+            process_climate_file("unknown.xml")
 
     def test_duplicate_alias_columns_are_rejected(self) -> None:
         with self.assertRaisesRegex(ClimateDataError, "same climate field"):

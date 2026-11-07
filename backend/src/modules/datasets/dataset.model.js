@@ -18,9 +18,11 @@ const datasetSchema = new mongoose.Schema(
     fileSize: { type: Number, min: 1 },
     processingStatus: {
       type: String,
-      enum: ["queued", "processing", "processed", "failed", "needs_review"],
+      enum: ["queued", "processing", "completed", "processed", "failed", "needs_review"],
       default: "queued"
     },
+    processingResults: { type: mongoose.Schema.Types.Mixed },
+    processingError: { type: String, maxlength: 500 },
     recordCount: { type: Number, min: 0, default: 0 },
     storagePath: { type: String, maxlength: 1024 },
     uploadId: { type: mongoose.Schema.Types.ObjectId, ref: "ClimateUpload", unique: true, sparse: true }
@@ -46,6 +48,8 @@ export function publicDataset(dataset) {
       ? { id: uploadedBy._id.toString(), email: uploadedBy.email }
       : uploadedBy?.toString(),
     processingStatus: dataset.processingStatus,
+    processingResults: dataset.processingResults,
+    processingError: dataset.processingError,
     recordCount: dataset.recordCount,
     storagePath: dataset.storagePath
   };

@@ -10,7 +10,13 @@ import ingestionRoutes from "./modules/ingestion/ingestion.routes.js";
 import observationRoutes from "./modules/observations/observation.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 
-export function createApp({ frontendOrigin, jwtSecret, climateStorage, datasetStorage }) {
+export function createApp({
+  frontendOrigin,
+  jwtSecret,
+  climateStorage,
+  datasetStorage,
+  climateProcessor
+}) {
   const app = express();
 
   app.use(cors({ origin: frontendOrigin }));
@@ -25,7 +31,7 @@ export function createApp({ frontendOrigin, jwtSecret, climateStorage, datasetSt
   });
 
   app.use("/api/auth", authRoutes({ jwtSecret }));
-  app.use("/api/datasets", datasetRoutes({ jwtSecret, datasetStorage }));
+  app.use("/api/datasets", datasetRoutes({ jwtSecret, datasetStorage, climateProcessor }));
   app.use("/api/alerts", alertRoutes({ jwtSecret }));
   app.use("/api/feedback", feedbackRoutes({ jwtSecret }));
   app.use("/api/users", userRoutes({ jwtSecret }));
