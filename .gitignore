@@ -11,6 +11,8 @@ __pycache__/
 
 # Local data and IDE files
 data/
+!frontend/src/data/
+!frontend/src/data/supportData.js
 /backend/uploads/
 .idea/
 .vscode/*
