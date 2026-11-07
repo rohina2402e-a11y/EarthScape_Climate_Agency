@@ -40,7 +40,7 @@ EarthScape_Climate_Agency/
 └── .vscode/
 ```
 
-The current frontend and backend use the conventional `src` layout created for the existing application. Python climate-processing dependencies live in `machine-learning/requirements.txt`; the local Python virtual environment is kept at the repository root and ignored by Git.
+The current frontend and backend use the conventional `src` layout created for the existing application. Minimal Python service dependencies live in `machine-learning/requirements.txt`; optional dependencies for local Dask, geospatial, and extended scientific-data workflows live in `machine-learning/requirements-development.txt`. The local Python virtual environment is kept at the repository root and ignored by Git.
 
 ## Requirements
 
@@ -49,7 +49,7 @@ The current frontend and backend use the conventional `src` layout created for t
 - MongoDB Community Server running locally, or a MongoDB URI.
 - A **64-bit Python 3.13** installation for climate data processing and analysis.
 
-The climate processing stack uses Pandas, NumPy, Dask, PyMongo, scikit-learn, TensorFlow, xarray, netCDF4, h5py, and Rasterio. XML parsing uses Python's standard library.
+The deployed climate processing service uses FastAPI, Pandas, and NumPy. Optional local analysis tools include Dask, PyMongo, scikit-learn, TensorFlow, xarray, netCDF4, h5py, and Rasterio. XML parsing uses Python's standard library.
 
 ## Open in VS Code
 
@@ -149,7 +149,7 @@ Install Python 3.13 from the [official Python downloads page](https://www.python
 ```powershell
 py -3.13 --version
 py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements-development.txt
 .\.venv\Scripts\python.exe -m pip check
 ```
 

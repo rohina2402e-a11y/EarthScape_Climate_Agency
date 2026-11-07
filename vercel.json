@@ -20,8 +20,7 @@
     "machine-learning": {
       "root": "machine-learning",
       "framework": "fastapi",
-      "entrypoint": "api.index:app",
-      "installCommand": "pip install -r api/requirements.txt"
+      "entrypoint": "api.index:app"
     }
   },
   "rewrites": [

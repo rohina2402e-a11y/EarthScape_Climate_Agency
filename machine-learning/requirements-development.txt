@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Local analysis, database integration, and scientific climate formats
+dask[dataframe]>=2025.1,<2027
+pymongo>=4.10,<5.0
+scikit-learn>=1.6,<2.0
+tensorflow>=2.20,<3.0
+xarray>=2025.1
+netCDF4>=1.7,<2.0
+h5py>=3.12,<4.0
+rasterio>=1.4,<2.0
+uvicorn>=0.30,<1.0

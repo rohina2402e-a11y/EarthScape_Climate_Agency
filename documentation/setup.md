@@ -27,7 +27,7 @@ Install 64-bit Python 3.13 from the [official Python for Windows downloads page]
 ```powershell
 py -3.13 --version
 py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements-development.txt
 .\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -37,13 +37,13 @@ The `.venv` virtual environment belongs at the repository root and is ignored by
 .\.venv\Scripts\python.exe -c "import numpy, pandas, dask, pymongo, sklearn, tensorflow, xarray, netCDF4, h5py, rasterio; print('Climate libraries are ready')"
 ```
 
-The packages cover tabular processing, larger-than-memory Dask workloads, MongoDB access, machine learning, NetCDF, HDF5, and GeoTIFF. Python's standard library will handle XML.
+`machine-learning/requirements.txt` contains only the FastAPI, NumPy, and Pandas dependencies used by the deployable CSV/JSON service. The optional `machine-learning/requirements-development.txt` manifest adds local Dask, MongoDB, scikit-learn, TensorFlow, NetCDF, HDF5, and GeoTIFF tooling. Python's standard library handles XML. The smaller service manifest also lets Vercel optimize the Python function bundle.
 
 The reusable climate reader is in `machine-learning/climate_processing/tabular.py`. It supports CSV, JSON, and XML records; NetCDF grids with time/latitude/longitude coordinates; HDF5 files with same-length named datasets; and GeoTIFF climate bands. Common field names are normalized, invalid or missing values become Pandas missing values, and incomplete records are kept for review. GeoTIFF files need a coordinate reference system and variable names in band descriptions/tags (a single-band file can use its filename). The analysis reports missing counts and percentages, temperature/rainfall/humidity/wind-speed/pressure statistics, and monthly and yearly trends. Values in a dataset must use consistent units; automatic unit conversion is not performed.
 
 ### Process uploaded CSV and JSON datasets
 
-The admin dataset upload endpoint stores the original file locally and leaves its content unchanged. CSV and JSON uploads are then sent from Express to the internal FastAPI service in `machine-learning/api/index.py`. Python normalizes date and numeric fields, removes duplicate rows and invalid dates, marks out-of-range measurements as missing, calculates measurement statistics and monthly/yearly trends, and uses scikit-learn Isolation Forest to flag unusual records. Express saves the summary, cleaning counts, and up to 100 example anomalies in the MongoDB dataset document. The processing status advances through `queued` and `processing` to `completed`, or becomes `failed` with an error message. Other accepted file formats remain queued because this processing pipeline handles CSV and JSON.
+The admin dataset upload endpoint stores the original file locally and leaves its content unchanged. CSV and JSON uploads are then sent from Express to the internal FastAPI service in `machine-learning/api/index.py`. Python normalizes date and numeric fields, removes duplicate rows and invalid dates, marks out-of-range measurements as missing, calculates measurement statistics and monthly/yearly trends, and uses NumPy robust outlier checks to flag unusual records. Express saves the summary, cleaning counts, and up to 100 example anomalies in the MongoDB dataset document. The processing status advances through `queued` and `processing` to `completed`, or becomes `failed` with an error message. Other accepted file formats remain queued because this processing pipeline handles CSV and JSON.
 
 Run the processor directly against the included sample file without changing it:
 
@@ -51,7 +51,7 @@ Run the processor directly against the included sample file without changing it:
 .\.venv\Scripts\python.exe machine-learning\scripts\process_dataset.py machine-learning\datasets\sample-climate.csv
 ```
 
-The script prints one JSON result containing `record_count`, `cleaning`, `summary.statistics`, `summary.monthly_trends`, `summary.yearly_trends`, and `anomalies`.
+The script prints one JSON result containing `record_count`, `cleaning`, `summary.statistics`, `summary.monthly_trends`, `summary.yearly_trends`, and `anomalies`. The deployment runtime dependencies are lightweight; install the optional development manifest if you also want Dask, scikit-learn, TensorFlow, and scientific/geospatial format readers locally.
 
 ### Deploy the existing app as Vercel services
 
@@ -66,7 +66,8 @@ npx vercel dev
 Then open `http://localhost:3000` and check `http://localhost:3000/api/health`. For regular local development without Vercel CLI, install the Python API dependencies and start the internal service in a second terminal:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r machine-learning\api\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r machine-learning\requirements.txt
+.\.venv\Scripts\python.exe -m pip install uvicorn
 .\.venv\Scripts\python.exe -m uvicorn api.index:app --app-dir machine-learning --host 127.0.0.1 --port 8000
 ```
 

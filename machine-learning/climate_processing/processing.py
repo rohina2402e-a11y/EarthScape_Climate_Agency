@@ -5,7 +5,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import IsolationForest
 
 from .tabular import (
     MEASUREMENT_COLUMNS,
@@ -42,11 +41,31 @@ def _detect_anomalies(frame: pd.DataFrame) -> tuple[int, list[dict[str, Any]]]:
     if len(frame) < 3 or not available_columns:
         return 0, []
 
-    values = frame.loc[:, available_columns].copy()
-    values = values.fillna(values.median()).fillna(0.0)
-    detector = IsolationForest(contamination="auto", random_state=42)
-    labels = detector.fit_predict(values)
-    anomaly_indices = np.flatnonzero(labels == -1)
+    values = frame.loc[:, available_columns].to_numpy(dtype=float)
+    anomaly_mask = np.zeros(len(frame), dtype=bool)
+    for column_values in values.T:
+        median = np.nanmedian(column_values)
+        deviations = np.abs(column_values - median)
+        median_deviation = np.nanmedian(deviations)
+        if median_deviation > 0:
+            anomaly_mask |= (0.6745 * deviations / median_deviation) > 3.5
+            continue
+
+        lower_quartile, upper_quartile = np.nanpercentile(column_values, [25, 75])
+        interquartile_range = upper_quartile - lower_quartile
+        if interquartile_range > 0:
+            anomaly_mask |= (
+                (column_values < lower_quartile - 1.5 * interquartile_range)
+                | (column_values > upper_quartile + 1.5 * interquartile_range)
+            )
+        else:
+            anomaly_mask |= np.isfinite(column_values) & ~np.isclose(
+                column_values,
+                median,
+                equal_nan=True
+            )
+
+    anomaly_indices = np.flatnonzero(anomaly_mask)
     anomalies = []
     for index in anomaly_indices[:ANOMALY_LIMIT]:
         record = frame.iloc[int(index)]
